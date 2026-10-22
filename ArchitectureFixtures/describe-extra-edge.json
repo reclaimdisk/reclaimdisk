@@ -1,0 +1,172 @@
+{
+  "targets": [
+    {
+      "name": "TestSupport",
+      "path": "Sources/TestSupport",
+      "target_dependencies": [
+        "SharedKernel",
+        "Inventory",
+        "Application"
+      ],
+      "type": "library"
+    },
+    {
+      "name": "SharedKernelTests",
+      "path": "Tests/SharedKernelTests",
+      "target_dependencies": [
+        "SharedKernel",
+        "TestSupport"
+      ],
+      "type": "test"
+    },
+    {
+      "name": "SharedKernel",
+      "path": "Sources/SharedKernel",
+      "type": "library"
+    },
+    {
+      "name": "ReclaimDiskApp",
+      "path": "Sources/ReclaimDiskApp",
+      "target_dependencies": [
+        "AppFeature"
+      ],
+      "type": "executable"
+    },
+    {
+      "name": "Ledger",
+      "path": "Sources/Ledger",
+      "target_dependencies": [
+        "SharedKernel"
+      ],
+      "type": "library"
+    },
+    {
+      "name": "InventoryTests",
+      "path": "Tests/InventoryTests",
+      "target_dependencies": [
+        "Inventory",
+        "SharedKernel",
+        "TestSupport"
+      ],
+      "type": "test"
+    },
+    {
+      "name": "Inventory",
+      "path": "Sources/Inventory",
+      "target_dependencies": [
+        "SharedKernel"
+      ],
+      "type": "library"
+    },
+    {
+      "name": "InfrastructureTests",
+      "path": "Tests/InfrastructureTests",
+      "target_dependencies": [
+        "Infrastructure",
+        "Application",
+        "SharedKernel",
+        "TestSupport"
+      ],
+      "type": "test"
+    },
+    {
+      "name": "Infrastructure",
+      "path": "Sources/Infrastructure",
+      "target_dependencies": [
+        "SharedKernel",
+        "Inventory",
+        "Application"
+      ],
+      "type": "library"
+    },
+    {
+      "name": "Cleanup",
+      "path": "Sources/Cleanup",
+      "target_dependencies": [
+        "Inventory",
+        "SharedKernel"
+      ],
+      "type": "library"
+    },
+    {
+      "name": "Catalog",
+      "path": "Sources/Catalog",
+      "target_dependencies": [
+        "SharedKernel"
+      ],
+      "type": "library"
+    },
+    {
+      "name": "CLITests",
+      "path": "Tests/CLITests",
+      "target_dependencies": [
+        "CLI",
+        "Application",
+        "Inventory",
+        "SharedKernel",
+        "TestSupport"
+      ],
+      "type": "test"
+    },
+    {
+      "name": "CLI",
+      "path": "Sources/CLI",
+      "product_dependencies": [
+        "ArgumentParser"
+      ],
+      "target_dependencies": [
+        "SharedKernel",
+        "Inventory",
+        "Application",
+        "Infrastructure"
+      ],
+      "type": "executable"
+    },
+    {
+      "name": "ApplicationTests",
+      "path": "Tests/ApplicationTests",
+      "target_dependencies": [
+        "Application",
+        "Inventory",
+        "SharedKernel",
+        "TestSupport"
+      ],
+      "type": "test"
+    },
+    {
+      "name": "Application",
+      "path": "Sources/Application",
+      "target_dependencies": [
+        "SharedKernel",
+        "Inventory",
+        "Catalog",
+        "Cleanup",
+        "Ledger"
+      ],
+      "type": "library"
+    },
+    {
+      "name": "AppFeatureTests",
+      "path": "Tests/AppFeatureTests",
+      "target_dependencies": [
+        "AppFeature",
+        "Application",
+        "Inventory",
+        "SharedKernel",
+        "TestSupport"
+      ],
+      "type": "test"
+    },
+    {
+      "name": "AppFeature",
+      "path": "Sources/AppFeature",
+      "target_dependencies": [
+        "SharedKernel",
+        "Inventory",
+        "Application",
+        "Infrastructure"
+      ],
+      "type": "library"
+    }
+  ]
+}

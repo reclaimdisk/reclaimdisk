@@ -1,0 +1,16 @@
+{
+  "domainTargets": ["SharedKernel", "Inventory", "Catalog", "Cleanup", "Ledger"],
+  "edges": {
+    "SharedKernel": [],
+    "Inventory": ["SharedKernel"],
+    "Catalog": ["SharedKernel"],
+    "Cleanup": ["SharedKernel"],
+    "Ledger": ["SharedKernel"],
+    "Application": ["SharedKernel", "Inventory", "Catalog", "Cleanup", "Ledger"],
+    "Infrastructure": ["SharedKernel", "Inventory", "Application"],
+    "CLI": ["SharedKernel", "Inventory", "Application", "Infrastructure", "product:ArgumentParser"],
+    "AppFeature": ["SharedKernel", "Inventory", "Application", "Infrastructure"],
+    "ReclaimDiskApp": ["AppFeature"],
+    "TestSupport": ["SharedKernel", "Inventory", "Application"]
+  }
+}

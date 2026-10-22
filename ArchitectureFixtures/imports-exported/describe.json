@@ -1,0 +1,1 @@
+{"targets":[{"name":"Cleanup","type":"library","path":"Sources/Cleanup","target_dependencies":["SharedKernel"]}]}

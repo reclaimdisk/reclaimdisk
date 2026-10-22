@@ -1,0 +1,7 @@
+{
+  "targets": [
+    { "name": "SharedKernel", "type": "regular", "settings": [] },
+    { "name": "Inventory", "type": "regular",
+      "settings": [ { "kind": { "unsafeFlags": { "_0": ["-Xfrontend", "-import-module", "-Xfrontend", "Foundation"] } }, "tool": "swift" } ] }
+  ]
+}
