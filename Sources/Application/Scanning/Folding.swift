@@ -1,0 +1,140 @@
+import Inventory
+import SharedKernel
+
+/// Turns the finished table into the kept node tree (plan Task 7, rule 8): classify every folder,
+/// keep the big or notable ones, and fold the rest into one aggregate per Kind under their kept parent.
+enum Folding {
+    static func rootDraft(table: DirectoryTable, options: ScanOptions, rootDisplayPath: CanonicalPath) -> NodeDraft {
+        Builder(table: table, options: options).draft(folder: 0, path: rootDisplayPath, parentKind: nil)
+    }
+
+    private struct Builder {
+        let table: DirectoryTable
+        let options: ScanOptions
+        let children: [[Int32]]
+        let totalTakesUp: [UInt64]
+        let totalFreesAtLeast: [UInt64]
+        let newestTotal: [Int64]
+        let keep: [Bool]
+
+        init(table: DirectoryTable, options: ScanOptions) {
+            self.table = table
+            self.options = options
+            let count = table.count
+            var children = Array(repeating: [Int32](), count: count)
+            var takes = table.ownTakesUp, frees = table.ownFreesAtLeast, newest = table.newestOwn
+            for (folder, files) in table.largeFiles {
+                for file in files {
+                    takes[Int(folder)] += file.takesUp
+                    frees[Int(folder)] += file.freesAtLeast
+                    newest[Int(folder)] = max(newest[Int(folder)], file.modified)
+                }
+            }
+            var keep = Array(repeating: false, count: count)
+            for index in 0..<count where !table.excluded[index] {
+                keep[index] = index == 0
+                    || takes[index] >= options.minimumNodeSize.bytes
+                    || options.retainedDirectoryNames.contains(table.name[index])
+                    || table.markers[Int32(index)] != nil
+                    || table.largeFiles[Int32(index)] != nil
+            }
+            // Children always have larger indices than their parent, so a reverse pass is a post-order.
+            for index in stride(from: count - 1, to: 0, by: -1) where !table.excluded[index] {
+                let parent = Int(table.parent[index])
+                children[parent].append(Int32(index))
+                takes[parent] += takes[index]
+                frees[parent] += frees[index]
+                newest[parent] = max(newest[parent], newest[index])
+                if keep[index] { keep[parent] = true }
+            }
+            self.children = children
+            totalTakesUp = takes
+            totalFreesAtLeast = frees
+            newestTotal = newest
+            self.keep = keep
+        }
+
+        func kind(of folder: Int32, path: CanonicalPath, parentKind: Kind?) -> Kind {
+            options.classifier.kind(for: path, name: table.name[Int(folder)], markers: table.markers[folder] ?? [], parentKind: parentKind)
+        }
+
+        func draft(folder: Int32, path: CanonicalPath, parentKind: Kind?) -> NodeDraft {
+            let index = Int(folder)
+            let folderKind = kind(of: folder, path: path, parentKind: parentKind)
+            var drafts: [(takes: UInt64, draft: NodeDraft)] = []
+            var folded = FoldedTotals()
+
+            for child in children[index] {
+                guard let childPath = path.appending(table.name[Int(child)]) else { continue }
+                if keep[Int(child)] {
+                    drafts.append((totalTakesUp[Int(child)], draft(folder: child, path: childPath, parentKind: folderKind)))
+                } else {
+                    fold(child, path: childPath, parentKind: folderKind, into: &folded)
+                }
+            }
+            for file in table.largeFiles[folder] ?? [] {
+                guard let filePath = path.appending(file.name) else { continue }
+                let node = NodeDraft(
+                    name: file.name, path: filePath, ownTakesUp: ByteCount(file.takesUp), ownFreesAtLeast: ByteCount(file.freesAtLeast),
+                    newestChange: Instant(nanosecondsSince1970: file.modified), markers: [], isFile: true, isAggregate: false,
+                    aggregateKind: nil, children: []
+                )
+                drafts.append((file.takesUp, node))
+            }
+            for (aggregateKind, total) in folded.byKind where total.takes > 0 || total.frees > 0 {
+                guard let aggregatePath = path.appending(".smaller-\(aggregateKind.rawValue)") else { continue }
+                let node = NodeDraft(
+                    name: total.count == 1 ? "1 smaller folder" : "\(total.count) smaller folders", path: aggregatePath,
+                    ownTakesUp: ByteCount(total.takes), ownFreesAtLeast: ByteCount(total.frees),
+                    newestChange: Instant(nanosecondsSince1970: total.newest), markers: [], isFile: false, isAggregate: true,
+                    aggregateKind: aggregateKind, children: []
+                )
+                drafts.append((total.takes, node))
+            }
+            drafts.sort { ($0.takes, $1.draft.name) > ($1.takes, $0.draft.name) }
+
+            return NodeDraft(
+                name: table.name[index], path: path,
+                ownTakesUp: ByteCount(table.ownTakesUp[index]), ownFreesAtLeast: ByteCount(table.ownFreesAtLeast[index]),
+                newestChange: Instant(nanosecondsSince1970: newestTotal[index]), markers: table.markers[folder] ?? [],
+                isFile: false, isAggregate: false, aggregateKind: nil, children: drafts.map(\.draft)
+            )
+        }
+
+        /// Adds a folded subtree's own bytes to the per-kind totals, classifying every folder in it.
+        /// A folder counts toward its kind's "n smaller folders" when it is a direct folded child or starts a new kind.
+        func fold(_ top: Int32, path: CanonicalPath, parentKind: Kind, into totals: inout FoldedTotals) {
+            var stack: [(folder: Int32, path: CanonicalPath, parentKind: Kind, isTop: Bool)] = [(top, path, parentKind, true)]
+            while let (folder, folderPath, inherited, isTop) = stack.popLast() {
+                let index = Int(folder)
+                let folderKind = kind(of: folder, path: folderPath, parentKind: inherited)
+                var entry = totals.byKind[folderKind] ?? FoldedTotals.Total()
+                entry.takes += table.ownTakesUp[index]
+                entry.frees += table.ownFreesAtLeast[index]
+                entry.newest = max(entry.newest, table.newestOwn[index])
+                for file in table.largeFiles[folder] ?? [] {
+                    entry.takes += file.takesUp
+                    entry.frees += file.freesAtLeast
+                    entry.newest = max(entry.newest, file.modified)
+                }
+                if isTop || folderKind != inherited { entry.count += 1 }
+                totals.byKind[folderKind] = entry
+                for child in children[index] {
+                    guard let childPath = folderPath.appending(table.name[Int(child)]) else { continue }
+                    stack.append((child, childPath, folderKind, false))
+                }
+            }
+        }
+    }
+
+    struct FoldedTotals {
+        struct Total {
+            var takes: UInt64 = 0
+            var frees: UInt64 = 0
+            var newest: Int64 = Int64.min
+            var count = 0
+        }
+
+        var byKind: [Kind: Total] = [:]
+    }
+}
