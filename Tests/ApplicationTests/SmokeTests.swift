@@ -2,5 +2,5 @@ import Testing
 @testable import Application
 
 @Test func moduleLinks() {
-    #expect(ApplicationContext.self == ApplicationContext.self)
+    #expect(ProductInfo.self == ProductInfo.self)
 }
