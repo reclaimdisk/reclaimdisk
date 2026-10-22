@@ -2,5 +2,5 @@ import Testing
 @testable import AppFeature
 
 @Test func moduleLinks() {
-    #expect(AppFeatureContext.self == AppFeatureContext.self)
+    #expect(DiskBarModel.self == DiskBarModel.self)
 }
