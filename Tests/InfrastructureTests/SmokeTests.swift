@@ -2,5 +2,5 @@ import Testing
 @testable import Infrastructure
 
 @Test func moduleLinks() {
-    #expect(InfrastructureContext.self == InfrastructureContext.self)
+    #expect(DarwinVolumeReader.self == DarwinVolumeReader.self)
 }
