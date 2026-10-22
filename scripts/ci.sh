@@ -22,3 +22,20 @@ swift scripts/check-architecture.swift settings architecture/allowed-dependencie
 
 swift build --explicit-target-dependency-import-check error
 swift test --explicit-target-dependency-import-check error
+
+# End-to-end: exact numbers for a real folder (plan Task 10, Step 4).
+bin="$(swift build --show-bin-path)/reclaimdisk"
+tmp=$(mktemp -d)
+head -c 1048576 /dev/urandom > "$tmp/plain"
+head -c 1048576 /dev/urandom > "$tmp/hl" && ln "$tmp/hl" "$tmp/hl2"
+head -c 1048576 /dev/urandom > "$tmp/orig" && cp -c "$tmp/orig" "$tmp/clone"
+sync
+"$bin" scan --path "$tmp" --json > "$tmp.json"
+# takesUp 4 MiB (plain + hard link once + two clones), freesAtLeast 2 MiB (plain + hard link), unique 3 MiB
+swift scripts/check-scan-json.swift "$tmp.json" 4194304 2097152 3145728
+rc=0; "$bin" scan --path /etc/hosts 2> "$tmp.err" || rc=$?
+[ "$rc" -eq 1 ] && grep -q "is not a folder" "$tmp.err" || { cat "$tmp.err" >&2; echo "expected exit 1 for a file path" >&2; exit 1; }
+rc=0; "$bin" scan --no-such-flag 2> /dev/null || rc=$?
+[ "$rc" -eq 1 ] || { echo "usage errors must exit 1, got $rc" >&2; exit 1; }
+rm -rf "$tmp" "$tmp.json" "$tmp.err"
+echo "end-to-end: ok"
