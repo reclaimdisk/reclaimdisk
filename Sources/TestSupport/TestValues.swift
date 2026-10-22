@@ -1,4 +1,5 @@
 import Application
+import Inventory
 import SharedKernel
 
 public func mib(_ n: UInt64) -> ByteCount { ByteCount(n * 1_048_576) }
@@ -34,3 +35,6 @@ public enum Entry {
         )
     }
 }
+
+/// The classifier tests use: home is /Users/u.
+public let testClassifier = KindClassifier(home: CanonicalPath("/Users/u")!)
