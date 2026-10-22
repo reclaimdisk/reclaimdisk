@@ -26,6 +26,7 @@ public struct ScanBuilder: Sendable {
 
         let rootName = options.root == Self.dataVolume ? "Data volume" : options.root.lastComponent
         var table = DirectoryTable(rootName: rootName)
+        var accounting = LinkAndCloneAccounting()
         var queue: [(folder: Int32, path: CanonicalPath)] = [(0, options.root)]
         var head = 0
         var directoriesRead = 0
@@ -65,7 +66,14 @@ public struct ScanBuilder: Sendable {
                             if entry.type == .file, options.markerFileNames.contains(entry.name) {
                                 table.markers[folder, default: []].insert(entry.name)
                             }
-                            guard entry.linkCount <= 1 else { continue }   // hard links: Task 8's accounting
+                            if entry.type == .file, entry.cloneRefCount > 1 {
+                                accounting.recordClone(cloneID: entry.cloneID, fileID: entry.fileID, allocated: entry.allocated.bytes)
+                            }
+                            if entry.type == .file, entry.linkCount > 1 {
+                                accounting.recordLink(fileID: entry.fileID, linkCount: entry.linkCount, allocated: entry.allocated.bytes,
+                                                      privateSize: entry.privateSize.bytes, folder: folder, name: entry.name)
+                                continue
+                            }
                             if entry.type == .file, entry.allocated >= options.minimumNodeSize {
                                 table.largeFiles[folder, default: []].append(DirectoryTable.LargeFile(
                                     name: entry.name, takesUp: entry.allocated.bytes, freesAtLeast: entry.privateSize.bytes,
@@ -92,6 +100,7 @@ public struct ScanBuilder: Sendable {
             }
         }
 
+        accounting.applyLinks(to: &table)   // before classification and folding (Task 8, rule 3)
         let rootDisplayPath = DisplayPath.forReadPath(options.root)
         let root = Folding.rootDraft(table: table, options: options, rootDisplayPath: rootDisplayPath)
         let unreadable = table.unreadable
@@ -99,7 +108,8 @@ public struct ScanBuilder: Sendable {
             .sorted { $0.path < $1.path }
         progress(ScanProgress(directoriesRead: directoriesRead, bytesSeen: ByteCount(bytesSeen), currentPath: nil))
         return ScanBuildResult(
-            root: root, unreadable: unreadable, scannedUniqueBytes: root.totalTakesUp,
+            root: root, unreadable: unreadable,
+            scannedUniqueBytes: root.totalTakesUp.subtractingClamped(ByteCount(accounting.cloneDuplicateBytes)),
             startedAt: startedAt, finishedAt: clock.now()
         )
     }
