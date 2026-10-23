@@ -1,7 +1,7 @@
 import Inventory
 import SharedKernel
 
-/// Turns the finished table into the kept node tree (plan Task 7, rule 8): classify every folder,
+/// Turns the finished table into the kept node tree: classify every folder,
 /// keep the big or notable ones, and fold the rest into one aggregate per Kind under their kept parent.
 enum Folding {
     static func rootDraft(table: DirectoryTable, options: ScanOptions, rootDisplayPath: CanonicalPath) -> NodeDraft {
@@ -53,7 +53,7 @@ enum Folding {
             for index in stride(from: count - 1, to: 0, by: -1) where !table.excluded[index] && keep[index] {
                 keep[Int(table.parent[index])] = true   // ancestors of kept folders are kept
             }
-            // Spec 8.3: a link's private bytes count only in a node that holds all its links, and the smallest such
+            // A link's private bytes count only in a node that holds all its links, and the smallest such
             // node gets them, so its total always includes the inode's takes-up.
             func nearestKept(_ folder: Int32) -> Int32 {
                 var current = folder

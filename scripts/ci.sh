@@ -23,7 +23,7 @@ swift scripts/check-architecture.swift settings architecture/allowed-dependencie
 swift build --explicit-target-dependency-import-check error
 swift test --explicit-target-dependency-import-check error
 
-# End-to-end: exact numbers for a real folder (plan Task 10, Step 4).
+# End-to-end: exact numbers for a real folder.
 bin="$(swift build --show-bin-path)/reclaimdisk"
 tmp=$(mktemp -d)
 head -c 1048576 /dev/urandom > "$tmp/plain"

@@ -7,7 +7,7 @@ public struct NodeDraft: Sendable, Equatable {
     public var path: CanonicalPath
     /// This node's own files, not its children.
     public var ownTakesUp: ByteCount
-    /// May exceed `ownTakesUp` (hard-link credit, spec 8.2); totals may not.
+    /// May exceed `ownTakesUp` (hard-link credit); totals may not.
     public var ownFreesAtLeast: ByteCount
     public var newestChange: Instant
     public var markers: Set<String>

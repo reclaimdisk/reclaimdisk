@@ -11,7 +11,7 @@ struct ReclaimDiskCommand: AsyncParsableCommand {
         subcommands: [ScanCommand.self]
     )
 
-    /// Spec 11.2 wants exit 1 for usage errors; swift-argument-parser would exit 64 (EX_USAGE), so main is ours.
+    /// Usage errors exit 1 like every other error; swift-argument-parser would exit 64 (EX_USAGE), so main is ours.
     static func main() async {
         do {
             var command = try parseAsRoot()

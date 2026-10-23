@@ -12,7 +12,7 @@ struct DirectoryTable {
         let modified: Int64
     }
 
-    /// A hard-linked inode's private bytes, freed only when every one of its link folders goes (spec 8.2).
+    /// A hard-linked inode's private bytes, freed only when every one of its link folders goes.
     /// Folding places it on the smallest node that holds all of them.
     struct LinkCredit {
         let commonAncestor: Int32

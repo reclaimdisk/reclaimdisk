@@ -1,6 +1,6 @@
 import SharedKernel
 
-/// Decides a folder's Kind (spec 6.2). Rules run in a fixed order and the first match wins:
+/// Decides a folder's Kind. Rules run in a fixed order and the first match wins:
 /// specific rules, then the parent's kind, then location rules. Paths are user-facing.
 public struct KindClassifier: Sendable {
     private let home: CanonicalPath

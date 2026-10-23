@@ -1,4 +1,4 @@
-// Architecture checks for spec 7.3. Run from the repository root:
+// Architecture checks (see docs/architecture.md). Run from the repository root:
 //   swift scripts/check-architecture.swift graph    <allowed.json> <describe.json>
 //   swift scripts/check-architecture.swift imports  <allowed.json> <describe.json> <packageRoot>
 //   swift scripts/check-architecture.swift settings <allowed.json> <dump.json>

@@ -1,7 +1,7 @@
 import Inventory
 import SharedKernel
 
-/// Walks one folder tree breadth-first and builds the kept node tree (plan Task 7).
+/// Walks one folder tree breadth-first and builds the kept node tree.
 public struct ScanBuilder: Sendable {
     private static let progressInterval: Int64 = 250_000_000
     private static let dataVolume = CanonicalPath("/System/Volumes/Data")!

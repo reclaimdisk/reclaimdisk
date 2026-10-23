@@ -3,7 +3,7 @@ import Foundation
 import Inventory
 import SharedKernel
 
-/// Formats a Scan as JSON schema 1 or as plain text (plan Task 10). Pure: no I/O.
+/// Formats a Scan as JSON schema 1 or as plain text. Pure: no I/O.
 enum ScanReport {
     // MARK: JSON schema 1
 

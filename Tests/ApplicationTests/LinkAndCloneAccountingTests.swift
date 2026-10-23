@@ -69,7 +69,7 @@ private func validated(_ result: ScanBuildResult) throws -> Scan {
 }
 
 /// /D/proj/a/x and /D/proj/a/node_modules/x are one inode. Both folders fold, into different kinds (other, build output),
-/// so no aggregate holds both links: the credit goes to /D, the smallest node that does (spec 8.3).
+/// so no aggregate holds both links: the credit goes to /D, the smallest node that does.
 @Test func hardLinkSplitAcrossFoldedKindsCreditsTheKeptFolder() async throws {
     let reader = FakeVolumeReader()
     reader.directory("/D", [Entry.dir("proj")])

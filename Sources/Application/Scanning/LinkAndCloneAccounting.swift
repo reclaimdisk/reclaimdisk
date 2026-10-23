@@ -1,6 +1,6 @@
 import SharedKernel
 
-/// Spec 8.2 and 8.6: hard links and full clones, counted honestly.
+/// Hard links and full clones, counted honestly.
 /// - A hard-linked inode's allocated bytes go to the folder of its first path in canonical order; its private
 ///   bytes become a link credit, but only when every link was found. Folding places the credit.
 /// - A full clone group (same clone id, refcount > 1) counts its blocks once in the scanned unique bytes.

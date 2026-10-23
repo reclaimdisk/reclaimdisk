@@ -23,7 +23,7 @@ private func entries(_ folder: TempFolder) throws -> [String: DirectoryEntry] {
     #expect(e.linkCount == 1)
 }
 
-// Pins the verified behavior: private size ignores hard links (spec 8.2).
+// Pins the verified behavior: private size ignores hard links.
 @Test func hardLinksShareFileIDAndReportFullPrivateSize() throws {
     let folder = try TempFolder()
     try folder.writeRandom("hl.bin", bytes: fourMiB)

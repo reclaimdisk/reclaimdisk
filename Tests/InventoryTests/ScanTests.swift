@@ -22,7 +22,7 @@ private func scan(_ root: NodeDraft, unique: UInt64 = 0, whole: Bool = false, un
              unreadable: unreadable, scannedUniqueBytes: ByteCount(unique), isWholeVolume: whole, classifier: testClassifier)
 }
 
-// The hard-link case of spec 8.2: credit lands on an ancestor whose OWN bytes have frees > takesUp,
+// The hard-link case: credit lands on an ancestor whose OWN bytes have frees > takesUp,
 // but every node TOTAL keeps frees <= takesUp. Scan.init must accept it.
 @Test func ownBytesMayCarryFreesWhileTotalsStayValid() throws {
     let child = NodeDraft(name: "B", path: CanonicalPath("/D/B")!, ownTakesUp: ByteCount(4), ownFreesAtLeast: .zero,

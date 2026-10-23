@@ -20,7 +20,7 @@ public struct Footprint: Hashable, Sendable {
     public static let zero = Footprint(unchecked: .zero, .zero)
 }
 
-/// Plain per-kind sums, deliberately not validated: hard-link credit (spec 8.2) can land on an
+/// Plain per-kind sums, deliberately not validated: hard-link credit can land on an
 /// ancestor of a different kind, so one kind's frees can exceed its takes.
 public struct KindTotal: Hashable, Sendable {
     public var takesUp: ByteCount

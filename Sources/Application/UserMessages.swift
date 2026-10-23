@@ -1,6 +1,6 @@
 import SharedKernel
 
-/// The only source of user-facing error text, shared by the CLI and the app (plan Task 9).
+/// The only source of user-facing error text, shared by the CLI and the app.
 public enum UserMessages {
     public static func text(for error: any Error) -> String {
         switch error {

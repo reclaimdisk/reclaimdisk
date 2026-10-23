@@ -1,4 +1,4 @@
-// End-to-end check of `reclaimdisk scan --json` (plan Task 10).
+// End-to-end check of `reclaimdisk scan --json`.
 // Usage: swift scripts/check-scan-json.swift <file.json> <root.takesUp> <root.freesAtLeast> <scannedUniqueBytes>
 import Foundation
 

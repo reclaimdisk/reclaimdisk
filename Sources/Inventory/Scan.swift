@@ -1,6 +1,6 @@
 import SharedKernel
 
-/// An immutable snapshot of one volume (or one folder on it) at one time (spec 6.2).
+/// An immutable snapshot of one volume (or one folder on it) at one time.
 public struct Scan: Hashable, Sendable {
     /// The Data volume's mount, e.g. /System/Volumes/Data.
     public let volumeMountPath: CanonicalPath

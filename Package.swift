@@ -12,7 +12,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.8.2"),
     ],
     targets: [
-        // Domain targets: depend only on the shared kernel (spec 7.1, enforced by scripts/check-architecture.swift).
+        // Domain targets: depend only on the shared kernel (enforced by scripts/check-architecture.swift; see docs/architecture.md).
         .target(name: "SharedKernel"),
         .target(name: "Inventory", dependencies: ["SharedKernel"]),
         .target(name: "Catalog", dependencies: ["SharedKernel"]),
