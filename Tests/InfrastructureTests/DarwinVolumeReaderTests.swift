@@ -152,3 +152,30 @@ private func entries(_ folder: TempFolder) throws -> [String: DirectoryEntry] {
         #expect(vm.usedByVolume < data.usedByVolume)
     }
 }
+
+@Test func interruptedReadsAreRetried() throws {
+    var calls = 0
+    let value = try DarwinVolumeReader.retryingInterrupted { () throws(DirectoryReadError) -> Int in
+        calls += 1
+        if calls < 3 { throw .other(errno: EINTR) }
+        return 7
+    }
+    #expect(value == 7 && calls == 3)
+}
+
+@Test func retriesStopAtTheLimitAndOnOtherErrors() {
+    var calls = 0
+    #expect(throws: DirectoryReadError.other(errno: EINTR)) {
+        try DarwinVolumeReader.retryingInterrupted(attempts: 4) { () throws(DirectoryReadError) -> Int in calls += 1; throw .other(errno: EINTR) }
+    }
+    #expect(calls == 4)
+    calls = 0
+    #expect(throws: DirectoryReadError.notPermitted) {
+        try DarwinVolumeReader.retryingInterrupted { () throws(DirectoryReadError) -> Int in calls += 1; throw .notPermitted }
+    }
+    #expect(calls == 1)
+}
+
+@Test func cloudOnlyFoldersHaveTheirOwnError() {
+    #expect(DarwinVolumeReader.error(for: EDEADLK) == .cloudOnly)
+}

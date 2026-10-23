@@ -67,3 +67,10 @@ private func decode(_ text: String) throws -> [String: Any] {
     #expect(throws: CLIFailure.self) { try ScanCommand.resolvePath("/", currentDirectory: cwd) }
     #expect(throws: CLIFailure.self) { try ScanCommand.resolvePath("/private/tmp/reclaimdisk-missing-\(UUID().uuidString)", currentDirectory: cwd) }
 }
+
+@Test func textNamesFoldersThatCouldNotBeRead() throws {
+    let denied = UnreadableArea(path: CanonicalPath("/Users/u/Projects/locked")!, reason: .permissionDenied)
+    let locked = UnreadableArea(path: CanonicalPath("/Users/u/Library/Mail")!, reason: .notPermitted)
+    #expect(ScanReport.text(try makeScan(whole: true, unreadable: [denied, locked])).contains("1 folder couldn't be read, so it isn't counted. Run with --json to see which."))
+    #expect(!ScanReport.text(try makeScan(whole: true, unreadable: [locked])).contains("couldn't be read"))
+}

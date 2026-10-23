@@ -22,4 +22,10 @@ private let p = CanonicalPath("/Users/u/x")!
     #expect(UserMessages.text(forUnresolvablePath: "../nope", error: .notFound) == "../nope doesn't exist. Check the path and try again.")
 }
 
+@Test func cloudOnlyAndUnreadableFolderMessages() {
+    #expect(UserMessages.text(for: ScanError.unreadable(p, .cloudOnly)) == "/Users/u/x is stored only in the cloud, so nothing in it takes up space on this Mac.")
+    #expect(UserMessages.unreadableFolders(count: 1) == "1 folder couldn't be read, so it isn't counted.")
+    #expect(UserMessages.unreadableFolders(count: 3) == "3 folders couldn't be read, so they aren't counted.")
+}
+
 private struct OddError: Error {}
