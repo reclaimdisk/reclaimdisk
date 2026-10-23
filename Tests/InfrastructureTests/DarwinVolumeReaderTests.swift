@@ -135,3 +135,11 @@ private func entries(_ folder: TempFolder) throws -> [String: DirectoryEntry] {
     let folder = try TempFolder()
     #expect(try reader.deviceID(of: folder.path) == reader.deviceID(of: CanonicalPath("/System/Volumes/Data")!))
 }
+
+// Final review, Important 3: stat's device id is shared by the System and Data volumes; the mount point is not.
+@Test func mountPathSeparatesSystemFromData() throws {
+    #expect(try reader.mountPath(of: CanonicalPath("/System/Library")!).raw == "/")
+    #expect(try reader.mountPath(of: CanonicalPath("/Users")!).raw == "/System/Volumes/Data")
+    let folder = try TempFolder()   // keep it alive: its deinit deletes the folder
+    #expect(try reader.mountPath(of: folder.path).raw == "/System/Volumes/Data")
+}

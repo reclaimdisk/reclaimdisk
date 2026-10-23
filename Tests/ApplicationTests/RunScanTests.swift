@@ -50,7 +50,7 @@ private func runScan(_ reader: FakeVolumeReader) -> RunScan { RunScan(reader: re
 @Test func pathOnAnotherVolumeIsRejected() async {
     let reader = volume()
     reader.directory("/Volumes/USB", [])
-    reader.device("/Volumes/USB", 9)
+    reader.mount("/Volumes/USB", "/Volumes/USB")
     await #expect(throws: ScanError.notOnDataVolume(CanonicalPath("/Volumes/USB")!)) {
         try await runScan(reader)(ScanRequest(path: CanonicalPath("/Volumes/USB")!), progress: { _ in })
     }
@@ -85,4 +85,19 @@ private func runScan(_ reader: FakeVolumeReader) -> RunScan { RunScan(reader: re
     let reader = volume()
     reader.failingCapacity(data, .permissionDenied)
     #expect(throws: ScanError.unreadable(CanonicalPath(data)!, .permissionDenied)) { try runScan(reader).preflight() }
+}
+
+// Final review, Important 3: System and Data share a device id, so the volume is decided by mount point.
+@Test func systemVolumePathsAreRejected() async {
+    let reader = volume()
+    reader.directory("/System/Library", [])
+    reader.mount("/System", "/")
+    reader.directory("/", [])
+    reader.mount("/", "/")
+    for raw in ["/System/Library", "/"] {
+        await #expect(throws: ScanError.notOnDataVolume(CanonicalPath(raw)!)) {
+            try await runScan(reader)(ScanRequest(path: CanonicalPath(raw)!), progress: { _ in })
+        }
+    }
+    #expect(reader.readLog.isEmpty)
 }

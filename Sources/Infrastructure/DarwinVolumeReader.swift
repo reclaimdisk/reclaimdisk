@@ -42,6 +42,16 @@ public struct DarwinVolumeReader: VolumeReader {
         return info.st_dev
     }
 
+    public func mountPath(of path: CanonicalPath) throws(DirectoryReadError) -> CanonicalPath {
+        var info = statfs()
+        guard statfs(path.raw, &info) == 0 else { throw Self.error(for: errno) }
+        let mount = withUnsafeBytes(of: &info.f_mntonname) { raw in
+            String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
+        }
+        guard let mountPath = CanonicalPath(mount) else { throw .other(errno: EINVAL) }
+        return mountPath
+    }
+
     public func capacity(ofVolumeAt mountPath: CanonicalPath) throws(DirectoryReadError) -> CapacityReading {
         var info = statfs()
         guard statfs(mountPath.raw, &info) == 0 else { throw Self.error(for: errno) }

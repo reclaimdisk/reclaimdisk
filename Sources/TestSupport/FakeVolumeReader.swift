@@ -8,6 +8,7 @@ public final class FakeVolumeReader: VolumeReader, @unchecked Sendable {
     private var directories: [CanonicalPath: Result<[DirectoryEntry], DirectoryReadError>] = [:]
     private var entryTypes: [CanonicalPath: Result<EntryType, DirectoryReadError>] = [:]
     private var devices: [CanonicalPath: Int32] = [:]
+    private var mounts: [CanonicalPath: CanonicalPath] = [:]
     private var capacities: [CanonicalPath: Result<CapacityReading, DirectoryReadError>] = [:]
     private var log: [CanonicalPath] = []
     private var _reverseEntryOrder = false
@@ -15,8 +16,13 @@ public final class FakeVolumeReader: VolumeReader, @unchecked Sendable {
 
     /// Device id returned for paths without an explicit one.
     public let defaultDeviceID: Int32
+    /// Mount point returned for paths without an explicit one.
+    public let defaultMountPath: CanonicalPath
 
-    public init(defaultDeviceID: Int32 = 1) { self.defaultDeviceID = defaultDeviceID }
+    public init(defaultDeviceID: Int32 = 1, defaultMountPath: String = "/System/Volumes/Data") {
+        self.defaultDeviceID = defaultDeviceID
+        self.defaultMountPath = Self.path(defaultMountPath)
+    }
 
     /// Every `readDirectory` call, in order.
     public var readLog: [CanonicalPath] { lock.withLock { log } }
@@ -63,6 +69,11 @@ public final class FakeVolumeReader: VolumeReader, @unchecked Sendable {
         lock.withLock { devices[Self.path(path)] = id }
     }
 
+    /// Paths at or below `path` report `mountPath` (nearest explicit ancestor wins).
+    public func mount(_ path: String, _ mountPath: String) {
+        lock.withLock { mounts[Self.path(path)] = Self.path(mountPath) }
+    }
+
     public func capacity(_ mountPath: String, _ reading: CapacityReading) {
         lock.withLock { capacities[Self.path(mountPath)] = .success(reading) }
     }
@@ -103,6 +114,17 @@ public final class FakeVolumeReader: VolumeReader, @unchecked Sendable {
                 current = p.parent
             }
             return defaultDeviceID
+        }
+    }
+
+    public func mountPath(of path: CanonicalPath) throws(DirectoryReadError) -> CanonicalPath {
+        lock.withLock {
+            var current: CanonicalPath? = path
+            while let p = current {
+                if let mount = mounts[p] { return mount }
+                current = p.parent
+            }
+            return defaultMountPath
         }
     }
 

@@ -84,17 +84,13 @@ public struct RunScan: Sendable {
     }
 
     /// The folder must exist, be a directory (callers resolve symlinks first) and sit on the Data volume.
+    /// The volume is decided by mount point: the System and Data volumes share one device id.
     private func checkFolder(_ path: CanonicalPath) throws(ScanError) {
         let type: EntryType
         do { type = try reader.entryType(at: path) } catch { throw .unreadable(path, error) }
         guard type == .directory else { throw .notADirectory(path) }
-        let device: Int32, dataDevice: Int32
-        do {
-            device = try reader.deviceID(of: path)
-            dataDevice = try reader.deviceID(of: Self.dataVolume)
-        } catch {
-            throw .unreadable(path, error)
-        }
-        guard device == dataDevice else { throw .notOnDataVolume(path) }
+        let mount: CanonicalPath
+        do { mount = try reader.mountPath(of: path) } catch { throw .unreadable(path, error) }
+        guard mount == Self.dataVolume else { throw .notOnDataVolume(path) }
     }
 }

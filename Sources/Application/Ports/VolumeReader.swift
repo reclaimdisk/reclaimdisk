@@ -65,5 +65,8 @@ public protocol VolumeReader: Sendable {
     /// lstat: never follows a symlink.
     func entryType(at path: CanonicalPath) throws(DirectoryReadError) -> EntryType
     func deviceID(of path: CanonicalPath) throws(DirectoryReadError) -> Int32
+    /// The mount point of the volume holding `path` (statfs). Unlike the device id, it tells the System volume ("/")
+    /// from the Data volume ("/System/Volumes/Data"), which share one APFS volume group.
+    func mountPath(of path: CanonicalPath) throws(DirectoryReadError) -> CanonicalPath
     func capacity(ofVolumeAt mountPath: CanonicalPath) throws(DirectoryReadError) -> CapacityReading
 }
