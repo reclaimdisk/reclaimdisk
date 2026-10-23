@@ -70,6 +70,7 @@ func checkImports(allowed: Allowed, describePath: String, packageRoot: String) t
         for case let file as URL in files where file.pathExtension == "swift" {
             let contents = try String(contentsOf: file, encoding: .utf8)
             var carried = ""
+            var reported = Set<String>()
             for (index, line) in contents.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 for piece in line.split(separator: ";", omittingEmptySubsequences: true) {
                     let statement = String(piece)
@@ -87,12 +88,42 @@ func checkImports(allowed: Allowed, describePath: String, packageRoot: String) t
                     }
                     if !allowedModules.contains(module) {
                         violations.append("\(location): \(name) imports \(module), which is not in its allowed edges")
+                        reported.insert(module)
                     }
                 }
+                for attribute in bannedAttributes where line.contains(attribute) {
+                    violations.append("\(file.path):\(index + 1): \(name) uses \(attribute), which reaches C symbols without an import")
+                }
+            }
+            // Second pass: the compiler's own list of imports catches forms the line scan can't see
+            // (an import after a block comment, the module name on the next line, …).
+            for module in try compilerImports(of: file) where !allowedModules.contains(module) && !reported.contains(module) {
+                violations.append("\(file.path): \(name) imports \(module), which is not in its allowed edges")
             }
         }
     }
     return violations
+}
+
+/// Attributes that call into C without any import statement; banned in domain targets.
+let bannedAttributes = ["@_silgen_name", "@_extern", "@_cdecl"]
+
+/// `swiftc -emit-imported-modules` parses the file and lists every imported module; it needs no module search paths.
+func compilerImports(of file: URL) throws -> [String] {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+    process.arguments = ["swiftc", "-emit-imported-modules", "-parse-as-library", file.path]
+    let output = Pipe(), errors = Pipe()
+    process.standardOutput = output
+    process.standardError = errors
+    try process.run()
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        throw NSError(domain: "check-architecture", code: 2, userInfo: [NSLocalizedDescriptionKey: "swiftc couldn't list imports of \(file.path): \(message)"])
+    }
+    return String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init).filter { !$0.isEmpty }
 }
 
 // MARK: settings
@@ -124,6 +155,15 @@ func selfTest() throws -> Bool {
         }, "@_exported import is not allowed"),
         ("settings: unsafe flags", { try checkSettings(allowed: allowed, dumpPath: "\(fixtures)/dump-unsafe-flags.json") },
          "Inventory declares build settings"),
+        ("imports: block comment before import", {
+            try checkImports(allowed: allowed, describePath: "\(fixtures)/imports-block-comment/describe.json", packageRoot: "\(fixtures)/imports-block-comment")
+        }, "Inventory imports Foundation"),
+        ("imports: module name on the next line", {
+            try checkImports(allowed: allowed, describePath: "\(fixtures)/imports-split-line/describe.json", packageRoot: "\(fixtures)/imports-split-line")
+        }, "Inventory imports Darwin"),
+        ("imports: @_silgen_name", {
+            try checkImports(allowed: allowed, describePath: "\(fixtures)/imports-silgen/describe.json", packageRoot: "\(fixtures)/imports-silgen")
+        }, "Inventory uses @_silgen_name"),
     ]
     var allPassed = true
     for (label, run, expected) in cases {
