@@ -77,30 +77,25 @@ private struct CellView: View {
     let cell: TreemapCell
     let scheme: ColorScheme
 
-    /// Depth-1 and depth-2 folders with subfolders draw their children below a header line.
-    private var isGroupHeader: Bool {
-        cell.depth < 3 && !cell.isOwnFiles && !cell.node.isAggregate && !cell.node.children.isEmpty
-    }
-
     var body: some View {
         let node = cell.node
         let fill = KindPalette.color(for: .kind(node.kind), scheme: scheme)
         ZStack(alignment: .topLeading) {
             Rectangle().fill(cell.isOwnFiles || node.isAggregate ? fill.opacity(0.75) : fill)
             Rectangle().strokeBorder(Color(nsColor: .windowBackgroundColor).opacity(0.9), lineWidth: cell.depth == 1 ? 1.5 : 0.5)
-            if cell.showsLabel {
+            if cell.label.showsName {
                 let name = Text(cell.isOwnFiles ? "Files in this folder" : node.displayName).font(.system(size: 11, weight: .semibold))
                 let size = Text(ByteText.nearest(cell.isOwnFiles ? node.ownTakesUp : node.footprint.takesUp)).font(.system(size: 10)).monospacedDigit()
                 Group {
-                    if isGroupHeader {   // one line, so it fits the 20/16 pt header above the nested cells
-                        HStack(spacing: 6) { name.lineLimit(1); size }
-                    } else {
-                        VStack(alignment: .leading, spacing: 0) { name.lineLimit(1); size }
+                    if cell.label.isStacked {
+                        VStack(alignment: .leading, spacing: 0) { name.lineLimit(1); if cell.label.showsSize { size.lineLimit(1) } }
+                    } else {   // one line, so it fits the 20/16 pt header above nested cells or a short cell
+                        HStack(spacing: 6) { name.lineLimit(1); if cell.label.showsSize { size.lineLimit(1).fixedSize() } }
                     }
                 }
                 .foregroundStyle(KindPalette.labelColor(scheme: scheme))
                 .padding(.horizontal, 4)
-                .padding(.vertical, 2)
+                .padding(.vertical, cell.label.isStacked ? 2 : 1)
             }
         }
     }
