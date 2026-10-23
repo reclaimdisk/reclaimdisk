@@ -43,3 +43,12 @@ private func k(_ p: String, markers: Set<String> = [], parent: Kind? = nil) -> K
     #expect(k("/Users/u/Projects/app/.claude/worktrees/x", parent: .projectSource) == .agentSessions)
     #expect(k("/Users/u/Projects/app/node_modules", parent: .projectSource) == .buildOutput)
 }
+
+/// Build output keeps its kind all the way down, even inside caches and agent folders.
+@Test func insideBuildOutputStaysBuildOutput() {
+    #expect(k("/private/tmp/claude-501/s/proj/node_modules/left-pad", parent: .buildOutput) == .buildOutput)
+    #expect(k("/Users/u/.claude/worktrees/w/target/debug", parent: .buildOutput) == .buildOutput)
+    #expect(k("/Users/u/Library/Caches/tool/node_modules/x", parent: .buildOutput) == .buildOutput)
+    #expect(k("/private/tmp/claude-501/s/node_modules/left-pad", parent: nil) == .buildOutput)   // a scan root inside build output
+    #expect(k("/private/tmp/claude-501/s/app", parent: nil) == .agentSessions)
+}
