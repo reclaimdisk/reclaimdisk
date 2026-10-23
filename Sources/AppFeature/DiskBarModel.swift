@@ -5,11 +5,15 @@ public struct DiskBarSegment: Equatable, Sendable {
     public enum Part: Hashable, Sendable { case kind(Kind), swap, otherVolumes, free }
 
     public let part: Part
+    /// The segment's width in the bar. Kinds are scaled to fit the volume there, since copies sharing blocks count once.
     public let bytes: ByteCount
+    /// The size the key shows: a kind's real takes-up, the same figure as the CLI and the map; otherwise `bytes`.
+    public let shownBytes: ByteCount
 
-    public init(part: Part, bytes: ByteCount) {
+    public init(part: Part, bytes: ByteCount, shownBytes: ByteCount? = nil) {
         self.part = part
         self.bytes = bytes
+        self.shownBytes = shownBytes ?? bytes
     }
 }
 
@@ -33,7 +37,7 @@ public enum DiskBarModel {
             target = 0
         }
         let scaled = scale(kinds.map(\.bytes), to: target)
-        var segments = zip(kinds, scaled).map { DiskBarSegment(part: .kind($0.0.kind), bytes: ByteCount($0.1)) }
+        var segments = zip(kinds, scaled).map { DiskBarSegment(part: .kind($0.0.kind), bytes: ByteCount($0.1), shownBytes: ByteCount($0.0.bytes)) }
         if notCounted > 0 { segments.append(DiskBarSegment(part: .kind(.notReadable), bytes: ByteCount(notCounted))) }
         if let swap = scan.disk.swapUsed { segments.append(DiskBarSegment(part: .swap, bytes: swap)) }
         segments.append(DiskBarSegment(part: .otherVolumes, bytes: scan.disk.otherVolumesUsed))
