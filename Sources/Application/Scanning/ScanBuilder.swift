@@ -123,7 +123,7 @@ public struct ScanBuilder: Sendable {
         case .notPermitted: .notPermitted
         case .nameTooLong: .pathTooLong
         case .other: .other
-        case .notFound, .notADirectory: nil
+        case .notFound, .notADirectory, .cloudOnly: nil   // gone, or nothing of it is on this Mac
         }
     }
 }

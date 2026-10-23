@@ -41,7 +41,8 @@ public struct DirectoryEntry: Sendable, Equatable {
 }
 
 public enum DirectoryReadError: Error, Equatable, Sendable {
-    case permissionDenied, notPermitted, notFound, notADirectory, nameTooLong, other(errno: Int32)
+    /// `cloudOnly`: a dataless folder whose contents live only in the cloud; nothing in it is stored on this Mac.
+    case permissionDenied, notPermitted, notFound, notADirectory, nameTooLong, cloudOnly, other(errno: Int32)
 }
 
 /// Raw capacity figures for one volume. RunScan translates them into the domain's `VolumeCapacity`.

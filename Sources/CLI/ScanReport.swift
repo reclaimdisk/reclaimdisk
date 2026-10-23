@@ -59,6 +59,9 @@ enum ScanReport {
         if scan.needsFullDiskAccess {
             lines.append("Some folders need Full Disk Access: open System Settings › Privacy & Security › Full Disk Access to include them.")
         }
+        if scan.otherUnreadableCount > 0 {
+            lines.append(UserMessages.unreadableFolders(count: scan.otherUnreadableCount) + " Run with --json to see which.")
+        }
         lines.append("")
         let kinds = sortedKinds(scan)
         let titleWidth = max(4, kinds.map { KindTitles.title(for: $0.kind).count }.max() ?? 0)

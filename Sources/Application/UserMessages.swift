@@ -19,6 +19,11 @@ public enum UserMessages {
         "Only \(formatted) free. The scan needs a little space for its own memory; free some space first if it fails."
     }
 
+    /// For folders the scan couldn't read for reasons Full Disk Access won't fix.
+    public static func unreadableFolders(count: Int) -> String {
+        count == 1 ? "1 folder couldn't be read, so it isn't counted." : "\(count) folders couldn't be read, so they aren't counted."
+    }
+
     private static func text(for error: ScanError) -> String {
         switch error {
         case .notADirectory(let path): "\(path) is not a folder. Choose a folder to scan."
@@ -36,6 +41,7 @@ public enum UserMessages {
         case .notFound: "\(subject) doesn't exist. Check the path and try again."
         case .nameTooLong: couldNotRead(subject, "path too long")
         case .notADirectory: couldNotRead(subject, "not a folder")
+        case .cloudOnly: "\(subject) is stored only in the cloud, so nothing in it takes up space on this Mac."
         case .other(let code): couldNotRead(subject, "errno \(code)")
         }
     }

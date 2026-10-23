@@ -7,9 +7,29 @@ import SharedKernel
 public struct DarwinVolumeReader: VolumeReader {
     private static let bufferSize = 256 * 1024
 
-    public init() {}
+    /// Also turns off materializing dataless (cloud-only) files for this process, so a scan never downloads anything:
+    /// reading such a folder fails at once instead (EDEADLK on macOS 26). Docs: man 3 getiopolicy_np.
+    public init() {
+        _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
+    }
 
     public func readDirectory(at path: CanonicalPath) throws(DirectoryReadError) -> [DirectoryEntry] {
+        try Self.retryingInterrupted { () throws(DirectoryReadError) in try readDirectoryOnce(at: path) }
+    }
+
+    /// Runs `body` again while it fails with EINTR, up to `attempts` times in all. Scans hit EINTR on ordinary folders
+    /// inside other apps' containers; a second read succeeds.
+    public static func retryingInterrupted<T>(attempts: Int = 5, _ body: () throws(DirectoryReadError) -> T) throws(DirectoryReadError) -> T {
+        var remaining = attempts
+        while true {
+            do { return try body() } catch {
+                remaining -= 1
+                guard error == .other(errno: EINTR), remaining > 0 else { throw error }
+            }
+        }
+    }
+
+    private func readDirectoryOnce(at path: CanonicalPath) throws(DirectoryReadError) -> [DirectoryEntry] {
         let fd = open(path.raw, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
         guard fd >= 0 else { throw Self.error(for: errno) }
         defer { close(fd) }
@@ -87,10 +107,11 @@ public struct DarwinVolumeReader: VolumeReader {
         return used >= 0 ? UInt64(used) : nil
     }
 
-    static func error(for code: Int32) -> DirectoryReadError {
+    public static func error(for code: Int32) -> DirectoryReadError {
         switch code {
         case EACCES: .permissionDenied
         case EPERM: .notPermitted
+        case EDEADLK: .cloudOnly
         case ENOENT: .notFound
         case ENOTDIR, ELOOP: .notADirectory
         case ENAMETOOLONG: .nameTooLong
