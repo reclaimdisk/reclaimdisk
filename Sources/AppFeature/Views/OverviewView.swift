@@ -32,13 +32,18 @@ struct OverviewContent: View {
             case .scanning(let progress):
                 ScanningView(progress: progress, cancel: model.cancel)
             case .failed(let message):
-                FailedView(message: message, retry: { model.start(model.lastRequest) })
+                FailedView(message: message, retry: { model.start(model.lastRequest) }, scanVolume: wholeVolumeScan)
             case .finished(let scan):
-                FinishedOverview(scan: scan, rescan: { model.start(model.lastRequest) }, scanFolder: { chooseFolder(model) })
+                FinishedOverview(scan: scan, rescan: { model.start(model.lastRequest) }, scanVolume: wholeVolumeScan, scanFolder: { chooseFolder(model) })
             }
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// After a folder scan, the way back to the whole Data volume.
+    private var wholeVolumeScan: (() -> Void)? {
+        model.offersWholeVolumeScan ? { [model] in model.start() } : nil
     }
 }
 
@@ -95,11 +100,15 @@ private struct ScanningView: View {
 private struct FailedView: View {
     let message: String
     let retry: () -> Void
+    let scanVolume: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(message, systemImage: "xmark.octagon").foregroundStyle(.red)
-            Button("Try again", action: retry)
+            HStack {
+                Button("Try again", action: retry)
+                if let scanVolume { Button("Scan Data volume", action: scanVolume) }
+            }
         }
     }
 }
@@ -107,6 +116,7 @@ private struct FailedView: View {
 struct FinishedOverview: View {
     let scan: Scan
     let rescan: () -> Void
+    let scanVolume: (() -> Void)?
     let scanFolder: () -> Void
     @Environment(\.colorScheme) private var scheme
 
@@ -127,22 +137,26 @@ struct FinishedOverview: View {
             }
             DiskBarView(segments: segments)
             if scan.needsFullDiskAccess { fullDiskAccessNotice }
+            if scan.otherUnreadableCount > 0 {
+                Text(UserMessages.unreadableFolders(count: scan.otherUnreadableCount)).font(.callout).foregroundStyle(.secondary)
+            }
             key(segments)
             HStack {
                 Button("Scan again", action: rescan)
+                if let scanVolume { Button("Scan Data volume", action: scanVolume) }
                 Button("Scan a folder…", action: scanFolder)
             }
         }
     }
 
     private var fullDiskAccessNotice: some View {
-        let locked = scan.unreadable.filter { $0.reason == .notPermitted }
+        let locked = LockedFolders.examples(in: scan, home: PathResolver.homeDirectory())
         return VStack(alignment: .leading, spacing: 6) {
             Label("Some folders need Full Disk Access", systemImage: "lock").font(.headline)
             Text("macOS keeps these folders locked until you grant Full Disk Access, so they aren't counted yet:")
                 .foregroundStyle(.secondary)
-            ForEach(locked.prefix(5), id: \.path) { area in
-                Text(DisplayText.escaped(area.path.raw)).font(.caption.monospaced())
+            ForEach(locked, id: \.raw) { path in
+                Text(DisplayText.escaped(path.raw)).font(.caption.monospaced())
             }
             Button("Open Full Disk Access settings") { NSWorkspace.shared.open(Self.fullDiskAccessURL) }
         }
@@ -167,7 +181,7 @@ struct FinishedOverview: View {
                         HStack {
                             Text(KindPalette.title(for: segment.part)).fontWeight(.semibold)
                             Spacer()
-                            Text(ByteText.nearest(segment.bytes)).monospacedDigit()
+                            Text(ByteText.nearest(segment.shownBytes)).monospacedDigit()
                         }
                         Text(KindPalette.description(for: segment.part)).font(.caption).foregroundStyle(.secondary)
                     }

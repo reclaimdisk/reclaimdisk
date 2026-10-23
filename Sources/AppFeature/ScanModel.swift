@@ -16,6 +16,9 @@ public final class ScanModel {
     public private(set) var state: State
     public private(set) var lastRequest = ScanRequest()
 
+    /// True after a folder scan (finished or failed), so the screen also offers the whole Data volume.
+    public var offersWholeVolumeScan: Bool { lastRequest.path != nil }
+
     private let runScan: RunScan
     private var task: Task<Void, Never>?
     /// Bumped on every start and cancel, so a stale scan can never write its result.
