@@ -9,7 +9,8 @@ public struct NodeDraft: Sendable, Equatable {
     public var ownTakesUp: ByteCount
     /// May exceed `ownTakesUp` (hard-link credit); totals may not.
     public var ownFreesAtLeast: ByteCount
-    public var newestChange: Instant
+    /// nil when the folder holds nothing with a date (an empty folder).
+    public var newestChange: Instant?
     public var markers: Set<String>
     public var isFile: Bool
     public var isAggregate: Bool
@@ -18,7 +19,7 @@ public struct NodeDraft: Sendable, Equatable {
     public var children: [NodeDraft]
 
     public init(
-        name: String, path: CanonicalPath, ownTakesUp: ByteCount, ownFreesAtLeast: ByteCount, newestChange: Instant,
+        name: String, path: CanonicalPath, ownTakesUp: ByteCount, ownFreesAtLeast: ByteCount, newestChange: Instant?,
         markers: Set<String>, isFile: Bool, isAggregate: Bool, aggregateKind: Kind?, children: [NodeDraft]
     ) {
         self.name = name

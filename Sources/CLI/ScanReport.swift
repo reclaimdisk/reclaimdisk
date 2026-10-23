@@ -35,7 +35,7 @@ enum ScanReport {
         [
             "name": node.name, "path": node.path.raw, "kind": node.kind.rawValue,
             "takesUp": node.footprint.takesUp.bytes, "freesAtLeast": node.footprint.freesAtLeast.bytes,
-            "newestChange": iso8601(node.newestChange), "isFile": node.isFile, "isAggregate": node.isAggregate,
+            "newestChange": node.newestChange.map { iso8601($0) as Any } ?? NSNull(), "isFile": node.isFile, "isAggregate": node.isAggregate,
             "markers": node.markers.sorted(), "children": node.children.map(Self.node),
         ]
     }
