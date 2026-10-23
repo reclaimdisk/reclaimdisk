@@ -85,7 +85,7 @@ private struct ScanningView: View {
             Text("Read \(ByteFormatting.grouped(progress.directoriesRead)) folders, \(ByteText.nearest(progress.bytesSeen))…")
                 .monospacedDigit()
             if let path = progress.currentPath {
-                Text(path.raw).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                Text(DisplayText.escaped(path.raw)).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
             Button("Cancel", action: cancel).keyboardShortcut(.cancelAction)
         }
@@ -121,7 +121,7 @@ struct FinishedOverview: View {
                 Text("\(ByteText.nearest(data.available)) free of \(ByteText.nearest(data.total)) · \(usedPercent) % used")
                     .font(.title.weight(.semibold))
             } else {
-                Text(scan.root.path.raw).font(.title2.weight(.semibold)).lineLimit(1).truncationMode(.middle)
+                Text(DisplayText.escaped(scan.root.path.raw)).font(.title2.weight(.semibold)).lineLimit(1).truncationMode(.middle)
                 Text("Takes up \(ByteText.nearest(scan.root.footprint.takesUp)) · frees at least \(ByteText.down(scan.root.footprint.freesAtLeast))")
                     .foregroundStyle(.secondary)
             }
@@ -142,7 +142,7 @@ struct FinishedOverview: View {
             Text("macOS keeps these folders locked until you grant Full Disk Access, so they aren't counted yet:")
                 .foregroundStyle(.secondary)
             ForEach(locked.prefix(5), id: \.path) { area in
-                Text(area.path.raw).font(.caption.monospaced())
+                Text(DisplayText.escaped(area.path.raw)).font(.caption.monospaced())
             }
             Button("Open Full Disk Access settings") { NSWorkspace.shared.open(Self.fullDiskAccessURL) }
         }

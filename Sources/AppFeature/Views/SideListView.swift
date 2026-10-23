@@ -13,7 +13,7 @@ struct SideListRows: View {
         let isOwnFiles: Bool
         var takes: ByteCount { isOwnFiles ? node.ownTakesUp : node.footprint.takesUp }
         var frees: ByteCount { isOwnFiles ? node.ownFreesAtLeast : node.footprint.freesAtLeast }
-        var name: String { isOwnFiles ? "Files in this folder" : node.name }
+        var name: String { isOwnFiles ? "Files in this folder" : node.displayName }
     }
 
     private var rows: [Row] {
@@ -29,7 +29,7 @@ struct SideListRows: View {
         let rows = rows
         let largest = max(1, rows.first.map { Double($0.takes.bytes) } ?? 1)
         VStack(alignment: .leading, spacing: 8) {
-            Text(navigator.current.name).font(.headline).lineLimit(1).truncationMode(.middle)
+            Text(navigator.current.displayName).font(.headline).lineLimit(1).truncationMode(.middle)
             ForEach(rows) { row in
                 Group {
                     if !row.isOwnFiles, navigator.canOpen(row.node) {
