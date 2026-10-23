@@ -159,3 +159,10 @@ private final class LastValue<T: Sendable>: @unchecked Sendable {
     #expect(result.unreadable.isEmpty)
     #expect(result.root.totalTakesUp == mib(1))
 }
+
+@Test func emptyFolderHasNoNewestChange() async throws {
+    let reader = FakeVolumeReader()
+    reader.directory("/S", [])
+    let root = try await build(reader, ScanOptions(root: CanonicalPath("/S")!, classifier: testClassifier)).root
+    #expect(root.newestChange == nil)
+}
