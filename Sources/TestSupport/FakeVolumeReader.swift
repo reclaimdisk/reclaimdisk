@@ -107,25 +107,11 @@ public final class FakeVolumeReader: VolumeReader, @unchecked Sendable {
     }
 
     public func deviceID(of path: CanonicalPath) throws(DirectoryReadError) -> Int32 {
-        lock.withLock {
-            var current: CanonicalPath? = path
-            while let p = current {
-                if let id = devices[p] { return id }
-                current = p.parent
-            }
-            return defaultDeviceID
-        }
+        lock.withLock { Self.nearest(devices, from: path, default: defaultDeviceID) }
     }
 
     public func mountPath(of path: CanonicalPath) throws(DirectoryReadError) -> CanonicalPath {
-        lock.withLock {
-            var current: CanonicalPath? = path
-            while let p = current {
-                if let mount = mounts[p] { return mount }
-                current = p.parent
-            }
-            return defaultMountPath
-        }
+        lock.withLock { Self.nearest(mounts, from: path, default: defaultMountPath) }
     }
 
     public func capacity(ofVolumeAt mountPath: CanonicalPath) throws(DirectoryReadError) -> CapacityReading {
@@ -134,6 +120,16 @@ public final class FakeVolumeReader: VolumeReader, @unchecked Sendable {
         case .failure(let error)?: throw error
         case nil: throw .notFound
         }
+    }
+
+    /// The value set for `path` or its nearest ancestor that has one.
+    private static func nearest<Value>(_ values: [CanonicalPath: Value], from path: CanonicalPath, default fallback: Value) -> Value {
+        var current: CanonicalPath? = path
+        while let p = current {
+            if let value = values[p] { return value }
+            current = p.parent
+        }
+        return fallback
     }
 
     private static func path(_ raw: String) -> CanonicalPath {
