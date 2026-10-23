@@ -31,31 +31,35 @@ struct SideListRows: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(navigator.current.name).font(.headline).lineLimit(1).truncationMode(.middle)
             ForEach(rows) { row in
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 2).fill(KindPalette.color(for: .kind(row.node.kind), scheme: scheme)).frame(width: 10, height: 10)
-                        Text(row.name).lineLimit(1).truncationMode(.middle)
-                        Spacer()
-                        Text(ByteText.nearest(row.takes)).monospacedDigit()
-                    }
-                    HStack(spacing: 6) {
-                        GeometryReader { geometry in
-                            Capsule().fill(KindPalette.color(for: .kind(row.node.kind), scheme: scheme))
-                                .frame(width: max(2, geometry.size.width * Double(row.takes.bytes) / largest))
+                // A real Button, so VoiceOver can open folders from this list (it is the accessible form of the map).
+                Button {
+                    if !row.isOwnFiles { navigator.open(row.node) }
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            RoundedRectangle(cornerRadius: 2).fill(KindPalette.color(for: .kind(row.node.kind), scheme: scheme)).frame(width: 10, height: 10)
+                            Text(row.name).lineLimit(1).truncationMode(.middle)
+                            Spacer()
+                            Text(ByteText.nearest(row.takes)).monospacedDigit()
                         }
-                        .frame(height: 4)
-                        Text("frees ≥ \(ByteText.down(row.frees))").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                        HStack(spacing: 6) {
+                            GeometryReader { geometry in
+                                Capsule().fill(KindPalette.color(for: .kind(row.node.kind), scheme: scheme))
+                                    .frame(width: max(2, geometry.size.width * Double(row.takes.bytes) / largest))
+                            }
+                            .frame(height: 4)
+                            Text("frees ≥ \(ByteText.down(row.frees))").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                        }
                     }
+                    .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
-                .onTapGesture { if !row.isOwnFiles { navigator.open(row.node) } }
+                .buttonStyle(.plain)
                 .contextMenu {
                     Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: row.node.path.raw)]) }
                         .disabled(!row.isOwnFiles && row.node.isAggregate)
                 }
-                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(row.name), takes up \(ByteText.nearest(row.takes)), frees at least \(ByteText.down(row.frees)), \(KindPalette.title(for: .kind(row.node.kind)))")
-                .accessibilityAddTraits(row.node.children.isEmpty || row.isOwnFiles ? [] : .isButton)
+                .accessibilityHint(row.isOwnFiles || row.node.isAggregate || row.node.children.isEmpty ? "" : "Opens this folder in the map")
             }
         }
     }
