@@ -31,6 +31,7 @@ scripts/ci.sh                                    # all checks
 - **"Frees at least" is a lower bound.** Blocks shared only between files you'd delete together aren't credited yet.
 - **Locked folders.** Some folders (Mail, Messages, Safari) need Full Disk Access to be counted: System Settings › Privacy & Security › Full Disk Access.
 - **"Not counted" space.** System-only folders, file-system metadata and snapshots stay uncounted, and the app shows them as "Not counted".
+- **Cloud-only folders count as zero.** Folders whose contents live only in iCloud, Google Drive or another cloud provider take no space on the Mac, and the scan never downloads them.
 
 ## Credits
 
