@@ -20,3 +20,12 @@ import Testing
     navigator.open(try #require(tree.find("/R/A/A1")))
     #expect(navigator.breadcrumbs.map(\.path.raw) == ["/R", "/R/A", "/R/A/A1"])
 }
+
+/// The side list makes only these rows buttons, so VoiceOver never offers an action that does nothing.
+@Test @MainActor func navigatorCanOpenOnlyFoldersWithChildren() throws {
+    let tree = try mapTestTree()
+    let navigator = MapNavigator(root: tree)
+    #expect(navigator.canOpen(try #require(tree.find("/R/A"))))
+    #expect(!navigator.canOpen(try #require(tree.find("/R/B"))))                       // a leaf
+    #expect(!navigator.canOpen(try #require(tree.children.first { $0.isAggregate })))   // an aggregate
+}
