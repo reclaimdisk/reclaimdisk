@@ -1,3 +1,9 @@
 .build/
 .swiftpm/
 *.xcodeproj/xcuserdata
+.DS_Store
+
+# Internal docs (their own private repository) and local review-tool output
+/.agent/
+/.keryx/
+/.superpowers/
