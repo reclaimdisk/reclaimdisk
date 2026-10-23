@@ -76,7 +76,7 @@ enum ScanReport {
             lines.append("Largest folders")
             for node in largest {
                 lines.append("  " + leftPad(size(node.footprint.takesUp), 10) + "  " + leftPad(size(node.footprint.freesAtLeast, rounding: .down), 10)
-                    + "  " + escaped(node.path.raw))
+                    + "  " + DisplayText.escaped(node.path.raw))
             }
         }
         return lines.joined(separator: "\n")
@@ -101,21 +101,6 @@ enum ScanReport {
 
     private static func size(_ bytes: ByteCount, rounding: ByteFormatting.Rounding = .nearest) -> String {
         ByteFormatting.string(bytes, rounding: rounding)
-    }
-
-    /// Control characters are shown escaped so a name can't break the layout.
-    static func escaped(_ text: String) -> String {
-        var result = ""
-        for scalar in text.unicodeScalars {
-            switch scalar {
-            case "\n": result += "\\n"
-            case "\t": result += "\\t"
-            case "\r": result += "\\r"
-            case _ where scalar.value < 0x20 || scalar.value == 0x7F: result += "\\u{\(String(scalar.value, radix: 16))}"
-            default: result.unicodeScalars.append(scalar)
-            }
-        }
-        return result
     }
 
     private static func pad(_ text: String, _ width: Int) -> String { text + String(repeating: " ", count: max(0, width - text.count)) }
