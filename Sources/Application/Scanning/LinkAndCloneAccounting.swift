@@ -2,7 +2,7 @@ import SharedKernel
 
 /// Spec 8.2 and 8.6: hard links and full clones, counted honestly.
 /// - A hard-linked inode's allocated bytes go to the folder of its first path in canonical order; its private
-///   bytes go to the lowest common ancestor of all its links, but only when every link was found.
+///   bytes become a link credit, but only when every link was found. Folding places the credit.
 /// - A full clone group (same clone id, refcount > 1) counts its blocks once in the scanned unique bytes.
 struct LinkAndCloneAccounting {
     private struct LinkedInode {
@@ -39,8 +39,9 @@ struct LinkAndCloneAccounting {
             guard let first = paths.min(by: { $0.path < $1.path }) else { continue }
             table.ownTakesUp[Int(first.folder)] += inode.allocated
             guard inode.occurrences.count == Int(inode.linkCount) else { continue }
-            let lca = lowestCommonAncestor(of: inode.occurrences.map(\.folder), in: table)
-            table.ownFreesAtLeast[Int(lca)] += inode.privateSize
+            let folders = inode.occurrences.map(\.folder)
+            table.linkCredits.append(.init(
+                commonAncestor: lowestCommonAncestor(of: folders, in: table), folders: folders, freesAtLeast: inode.privateSize))
         }
     }
 

@@ -12,6 +12,14 @@ struct DirectoryTable {
         let modified: Int64
     }
 
+    /// A hard-linked inode's private bytes, freed only when every one of its link folders goes (spec 8.2).
+    /// Folding places it on the smallest node that holds all of them.
+    struct LinkCredit {
+        let commonAncestor: Int32
+        let folders: [Int32]
+        let freesAtLeast: UInt64
+    }
+
     private(set) var parent: [Int32] = [-1]
     private(set) var name: [String]
     var ownTakesUp: [UInt64] = [0]
@@ -22,6 +30,7 @@ struct DirectoryTable {
     var markers: [Int32: Set<String>] = [:]
     var largeFiles: [Int32: [LargeFile]] = [:]
     var unreadable: [(folder: Int32, reason: UnreadableReason)] = []
+    var linkCredits: [LinkCredit] = []
 
     init(rootName: String) { name = [rootName] }
 

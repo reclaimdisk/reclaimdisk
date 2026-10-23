@@ -13,20 +13,24 @@ enum Folding {
         let options: ScanOptions
         let children: [[Int32]]
         let totalTakesUp: [UInt64]
-        let totalFreesAtLeast: [UInt64]
         let newestTotal: [Int64]
         let keep: [Bool]
+        /// Link credit whose common ancestor is kept: that folder holds every link.
+        let keptCredit: [Int32: UInt64]
+        /// Link credit whose common ancestor is folded, by its nearest kept ancestor; placed once kinds are known.
+        let foldedCredits: [Int32: [DirectoryTable.LinkCredit]]
+        /// Folders holding links of `foldedCredits`, whose kinds `fold` records.
+        let linkFolders: Set<Int32>
 
         init(table: DirectoryTable, options: ScanOptions) {
             self.table = table
             self.options = options
             let count = table.count
             var children = Array(repeating: [Int32](), count: count)
-            var takes = table.ownTakesUp, frees = table.ownFreesAtLeast, newest = table.newestOwn
+            var takes = table.ownTakesUp, newest = table.newestOwn
             for (folder, files) in table.largeFiles {
                 for file in files {
                     takes[Int(folder)] += file.takesUp
-                    frees[Int(folder)] += file.freesAtLeast
                     newest[Int(folder)] = max(newest[Int(folder)], file.modified)
                 }
             }
@@ -36,7 +40,6 @@ enum Folding {
                 let parent = Int(table.parent[index])
                 children[parent].append(Int32(index))
                 takes[parent] += takes[index]
-                frees[parent] += frees[index]
                 newest[parent] = max(newest[parent], newest[index])
             }
             var keep = Array(repeating: false, count: count)
@@ -50,11 +53,26 @@ enum Folding {
             for index in stride(from: count - 1, to: 0, by: -1) where !table.excluded[index] && keep[index] {
                 keep[Int(table.parent[index])] = true   // ancestors of kept folders are kept
             }
+            // Spec 8.3: a link's private bytes count only in a node that holds all its links, and the smallest such
+            // node gets them, so its total always includes the inode's takes-up.
+            var keptCredit: [Int32: UInt64] = [:], foldedCredits: [Int32: [DirectoryTable.LinkCredit]] = [:], linkFolders = Set<Int32>()
+            for credit in table.linkCredits {
+                var home = credit.commonAncestor
+                while !keep[Int(home)] { home = table.parent[Int(home)] }   // the root is always kept
+                if home == credit.commonAncestor {
+                    keptCredit[home, default: 0] += credit.freesAtLeast
+                } else {
+                    foldedCredits[home, default: []].append(credit)
+                    linkFolders.formUnion(credit.folders)
+                }
+            }
             self.children = children
             totalTakesUp = takes
-            totalFreesAtLeast = frees
             newestTotal = newest
             self.keep = keep
+            self.keptCredit = keptCredit
+            self.foldedCredits = foldedCredits
+            self.linkFolders = linkFolders
         }
 
         func kind(of folder: Int32, path: CanonicalPath, parentKind: Kind?) -> Kind {
@@ -66,6 +84,7 @@ enum Folding {
             let folderKind = kind(of: folder, path: path, parentKind: parentKind)
             var drafts: [(takes: UInt64, draft: NodeDraft)] = []
             var folded = FoldedTotals()
+            var ownFrees = table.ownFreesAtLeast[index] + (keptCredit[folder] ?? 0)
 
             for child in children[index] {
                 guard let childPath = path.appending(table.name[Int(child)]) else { continue }
@@ -73,6 +92,14 @@ enum Folding {
                     drafts.append((totalTakesUp[Int(child)], draft(folder: child, path: childPath, parentKind: folderKind)))
                 } else {
                     fold(child, path: childPath, parentKind: folderKind, into: &folded)
+                }
+            }
+            for credit in foldedCredits[folder] ?? [] {
+                let kinds = Set(credit.folders.map { folded.kindOf[$0] })
+                if kinds.count == 1, let kind = kinds.first ?? nil {
+                    folded.byKind[kind, default: FoldedTotals.Total()].frees += credit.freesAtLeast   // one aggregate holds every link
+                } else {
+                    ownFrees += credit.freesAtLeast                                                   // the links fold into different kinds
                 }
             }
             for file in table.largeFiles[folder] ?? [] {
@@ -98,7 +125,7 @@ enum Folding {
 
             return NodeDraft(
                 name: table.name[index], path: path,
-                ownTakesUp: ByteCount(table.ownTakesUp[index]), ownFreesAtLeast: ByteCount(table.ownFreesAtLeast[index]),
+                ownTakesUp: ByteCount(table.ownTakesUp[index]), ownFreesAtLeast: ByteCount(ownFrees),
                 newestChange: Instant(nanosecondsSince1970: newestTotal[index]), markers: table.markers[folder] ?? [],
                 isFile: false, isAggregate: false, aggregateKind: nil, children: drafts.map(\.draft)
             )
@@ -122,6 +149,7 @@ enum Folding {
                 }
                 if isTop || folderKind != inherited { entry.count += 1 }
                 totals.byKind[folderKind] = entry
+                if linkFolders.contains(folder) { totals.kindOf[folder] = folderKind }
                 for child in children[index] {
                     guard let childPath = folderPath.appending(table.name[Int(child)]) else { continue }
                     stack.append((child, childPath, folderKind, false))
@@ -139,5 +167,7 @@ enum Folding {
         }
 
         var byKind: [Kind: Total] = [:]
+        /// The kinds of folded folders that hold hard links, for placing their credit.
+        var kindOf: [Int32: Kind] = [:]
     }
 }
