@@ -22,6 +22,15 @@ import TestSupport
     #expect(try reader.deviceID(of: CanonicalPath("/Users")!) == 1)
 }
 
+@Test func fakeReaderMountFallsBackToNearestAncestor() throws {
+    let reader = FakeVolumeReader(defaultMountPath: "/System/Volumes/Data")
+    reader.mount("/", "/")
+    reader.mount("/System/Volumes/Data", "/System/Volumes/Data")
+    #expect(try reader.mountPath(of: CanonicalPath("/System/Library")!).raw == "/")
+    #expect(try reader.mountPath(of: CanonicalPath("/System/Volumes/Data/Users/u")!).raw == "/System/Volumes/Data")
+    #expect(try FakeVolumeReader().mountPath(of: CanonicalPath("/Users")!).raw == "/System/Volumes/Data")
+}
+
 @Test func fakeClockAdvancesByStep() {
     let clock = FakeClock(stepNanoseconds: 5)
     #expect(clock.now() == Instant(nanosecondsSince1970: 0))
