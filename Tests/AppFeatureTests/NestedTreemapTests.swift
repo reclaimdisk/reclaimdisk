@@ -67,3 +67,15 @@ private func cell(_ cells: [TreemapCell], _ id: String) throws -> TreemapCell { 
     #expect(NestedTreemap.openTarget(for: try cell(cells, "/R#files"), in: cells) == nil)
     #expect(NestedTreemap.openTarget(for: try cell(cells, "/R/.smaller-other#aggregate"), in: cells) == nil)
 }
+
+@Test func labelsShowTheSizeOnlyWhereItFits() {
+    let narrowHeader = NestedTreemap.label(depth: 2, isGroup: true, size: CGSize(width: 80, height: 16))
+    #expect(narrowHeader.showsName && !narrowHeader.showsSize && !narrowHeader.isStacked)
+    let wideHeader = NestedTreemap.label(depth: 1, isGroup: true, size: CGSize(width: 200, height: 20))
+    #expect(wideHeader.showsName && wideHeader.showsSize && !wideHeader.isStacked)
+    let shortLeaf = NestedTreemap.label(depth: 1, isGroup: false, size: CGSize(width: 90, height: 20))
+    #expect(shortLeaf.showsName && !shortLeaf.showsSize && !shortLeaf.isStacked)   // two lines wouldn't fit 20 pt
+    let tallLeaf = NestedTreemap.label(depth: 3, isGroup: false, size: CGSize(width: 60, height: 40))
+    #expect(tallLeaf.showsName && tallLeaf.showsSize && tallLeaf.isStacked)
+    #expect(!NestedTreemap.label(depth: 3, isGroup: false, size: CGSize(width: 40, height: 40)).showsName)
+}
