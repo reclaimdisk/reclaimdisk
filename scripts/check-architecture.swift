@@ -141,7 +141,8 @@ func checkSettings(allowed: Allowed, dumpPath: String) throws -> [String] {
 func selfTest() throws -> Bool {
     let allowed = try Allowed(path: "architecture/allowed-dependencies.json")
     let fixtures = "ArchitectureFixtures"
-    let cases: [(String, () throws -> [String], String)] = [
+    // nil expects no violations at all.
+    let cases: [(String, () throws -> [String], String?)] = [
         ("graph: extra edge", { try checkGraph(allowed: allowed, describePath: "\(fixtures)/describe-extra-edge.json") },
          "unexpected edge Cleanup -> Inventory"),
         ("imports: ';'-joined Foundation", {
@@ -164,17 +165,43 @@ func selfTest() throws -> Bool {
         ("imports: @_silgen_name", {
             try checkImports(allowed: allowed, describePath: "\(fixtures)/imports-silgen/describe.json", packageRoot: "\(fixtures)/imports-silgen")
         }, "Inventory uses @_silgen_name"),
+        ("imports: inside #if DEBUG", {
+            try checkImports(allowed: allowed, describePath: "\(fixtures)/imports-if-debug/describe.json", packageRoot: "\(fixtures)/imports-if-debug")
+        }, "Inventory imports Foundation"),
+        ("imports: inside #if !DEBUG", {
+            try checkImports(allowed: allowed, describePath: "\(fixtures)/imports-if-release/describe.json", packageRoot: "\(fixtures)/imports-if-release")
+        }, "Inventory imports Darwin"),
+        ("imports: attributes named in comments and strings", {
+            try checkImports(allowed: allowed, describePath: "\(fixtures)/attributes-in-comments/describe.json", packageRoot: "\(fixtures)/attributes-in-comments")
+        }, nil),
+        ("imports: swiftc writes a long error log", {
+            // Over a pipe buffer of errors (about 64 KiB): the check must report it, not wait forever.
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("check-architecture-noisy-\(getpid())")
+            let sources = root.appendingPathComponent("Sources/Inventory")
+            try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            try String(repeating: "let = \n", count: 2_000).write(to: sources.appendingPathComponent("Bad.swift"), atomically: true, encoding: .utf8)
+            do {
+                return try checkImports(allowed: allowed, describePath: "\(fixtures)/imports-split-line/describe.json", packageRoot: root.path)
+            } catch {
+                return [error.localizedDescription]
+            }
+        }, "swiftc couldn't list imports"),
     ]
     var allPassed = true
     for (label, run, expected) in cases {
         let violations = try run()
-        let hasExpected = violations.contains { $0.contains(expected) }
-        let unexpected = violations.filter { !$0.contains(expected) }
-        if hasExpected && unexpected.isEmpty {
-            print("self-test PASS  \(label): \(expected)")
+        let passed: Bool
+        if let expected {
+            passed = violations.contains { $0.contains(expected) } && violations.allSatisfy { $0.contains(expected) }
+        } else {
+            passed = violations.isEmpty
+        }
+        if passed {
+            print("self-test PASS  \(label): \(expected ?? "no violations")")
         } else {
             allPassed = false
-            print("self-test FAIL  \(label): expected exactly '\(expected)', got \(violations)")
+            print("self-test FAIL  \(label): expected \(expected.map { "exactly '\($0)'" } ?? "no violations"), got \(violations)")
         }
     }
     return allPassed
