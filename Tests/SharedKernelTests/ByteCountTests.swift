@@ -27,3 +27,11 @@ import Testing
     #expect(Kind.caches.rawValue == "caches")
     #expect(ReclaimClass.toolManaged.rawValue == "tool-managed")
 }
+
+// Final review, Important 2: APFS clamps very old dates to the lowest 64-bit nanosecond value; converting must not trap.
+@Test func instantSaturatesInsteadOfOverflowing() {
+    #expect(Instant(seconds: -9_223_372_037, nanoseconds: 0) == Instant(nanosecondsSince1970: .min))
+    #expect(Instant(seconds: 9_223_372_037, nanoseconds: 0) == Instant(nanosecondsSince1970: .max))
+    #expect(Instant(seconds: -9_223_372_036, nanoseconds: -854_775_808) == Instant(nanosecondsSince1970: .min))
+    #expect(Instant(seconds: 9_223_372_036, nanoseconds: 854_775_808) == Instant(nanosecondsSince1970: .max))
+}
