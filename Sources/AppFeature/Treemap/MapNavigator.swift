@@ -13,9 +13,12 @@ public final class MapNavigator {
     /// Root … current.
     public var breadcrumbs: [Node] { stack }
 
+    /// Whether `open(_:)` shows `node`: folders with children, never aggregates.
+    public func canOpen(_ node: Node) -> Bool { !node.isAggregate && !node.children.isEmpty }
+
     /// No-op for nodes without children and for aggregates.
     public func open(_ node: Node) {
-        guard !node.isAggregate, !node.children.isEmpty else { return }
+        guard canOpen(node) else { return }
         open(path: node.path)
     }
 
