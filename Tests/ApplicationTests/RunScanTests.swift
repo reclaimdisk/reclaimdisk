@@ -101,3 +101,14 @@ private func runScan(_ reader: FakeVolumeReader) -> RunScan { RunScan(reader: re
     }
     #expect(reader.readLog.isEmpty)
 }
+
+// Final review, re-graded Important: one file reporting more private bytes than allocated must not fail the whole scan.
+@Test func oddFileWithPrivateAboveAllocatedIsClamped() async throws {
+    let reader = volume()
+    reader.directory("/Users/u/odd", [Entry.file("weird", allocated: mib(4), private: mib(5), fileID: 1),
+                                      Entry.file("linked", allocated: mib(2), private: mib(3), fileID: 2, links: 2),
+                                      Entry.file("linked2", allocated: mib(2), private: mib(3), fileID: 2, links: 2)])
+    let scan = try await runScan(reader)(ScanRequest(path: CanonicalPath("/Users/u/odd")!), progress: { _ in })
+    #expect(scan.root.footprint.takesUp == mib(6))
+    #expect(scan.root.footprint.freesAtLeast == mib(6))   // 4 + 2, each clamped to its allocated size
+}

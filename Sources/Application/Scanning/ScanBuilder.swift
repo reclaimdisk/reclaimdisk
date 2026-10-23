@@ -63,6 +63,8 @@ public struct ScanBuilder: Sendable {
                             queue.append((child, childPath))
                         case .file, .symlink:
                             bytesSeen += entry.allocated.bytes
+                            // "Frees at least" can never exceed what the file occupies; clamp so one odd value can't fail the scan.
+                            let privateBytes = min(entry.privateSize.bytes, entry.allocated.bytes)
                             if entry.type == .file, options.markerFileNames.contains(entry.name) {
                                 table.markers[folder, default: []].insert(entry.name)
                             }
@@ -71,16 +73,16 @@ public struct ScanBuilder: Sendable {
                             }
                             if entry.type == .file, entry.linkCount > 1 {
                                 accounting.recordLink(fileID: entry.fileID, linkCount: entry.linkCount, allocated: entry.allocated.bytes,
-                                                      privateSize: entry.privateSize.bytes, folder: folder, name: entry.name)
+                                                      privateSize: privateBytes, folder: folder, name: entry.name)
                                 continue
                             }
                             if entry.type == .file, entry.allocated >= options.minimumNodeSize {
                                 table.largeFiles[folder, default: []].append(DirectoryTable.LargeFile(
-                                    name: entry.name, takesUp: entry.allocated.bytes, freesAtLeast: entry.privateSize.bytes,
+                                    name: entry.name, takesUp: entry.allocated.bytes, freesAtLeast: privateBytes,
                                     modified: entry.modified.nanosecondsSince1970))
                             } else {
                                 table.ownTakesUp[Int(folder)] += entry.allocated.bytes
-                                table.ownFreesAtLeast[Int(folder)] += entry.privateSize.bytes
+                                table.ownFreesAtLeast[Int(folder)] += privateBytes
                             }
                         case .other:
                             continue
