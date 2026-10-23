@@ -36,6 +36,9 @@ public struct Scan: Hashable, Sendable {
     /// True when some folder is locked by macOS privacy (EPERM), which Full Disk Access can lift.
     public var needsFullDiskAccess: Bool { unreadable.contains { $0.reason == .notPermitted } }
 
+    /// Folders that couldn't be read for reasons Full Disk Access won't fix.
+    public var otherUnreadableCount: Int { unreadable.filter { $0.reason != .notPermitted }.count }
+
     /// Own bytes summed by node kind. The takes-up figures add up to the root's takes-up.
     public func kindTotals() -> [Kind: KindTotal] {
         var totals: [Kind: KindTotal] = [:]
