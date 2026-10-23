@@ -3,7 +3,7 @@ import Darwin
 import Foundation
 import SharedKernel
 
-/// The real `VolumeReader`: getattrlistbulk for directories, lstat for single entries, statfs for capacity.
+/// The real `VolumeReader`: getattrlistbulk for directories, lstat for single entries, statfs and getattrlist for capacity.
 public struct DarwinVolumeReader: VolumeReader {
     private static let bufferSize = 256 * 1024
 
@@ -58,7 +58,8 @@ public struct DarwinVolumeReader: VolumeReader {
         let blockSize = UInt64(info.f_bsize)
         let total = UInt64(info.f_blocks) * blockSize
         let available = UInt64(info.f_bavail) * blockSize
-        let used = (UInt64(info.f_blocks) - UInt64(info.f_bfree)) * blockSize
+        // On APFS, statfs's f_blocks - f_bfree is the whole container's use, the same for every volume in it.
+        let used = Self.spaceUsed(byVolumeAt: mountPath) ?? (UInt64(info.f_blocks) - UInt64(info.f_bfree)) * blockSize
         // Docs: https://developer.apple.com/documentation/foundation/urlresourcekey/volumeavailablecapacityforimportantusagekey
         let important = (try? URL(fileURLWithPath: mountPath.raw)
             .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
@@ -69,6 +70,21 @@ public struct DarwinVolumeReader: VolumeReader {
             total: ByteCount(total), available: ByteCount(available),
             availableForImportantUsage: ByteCount(important), usedByVolume: ByteCount(used)
         )
+    }
+
+    /// This volume's own use (getattrlist ATTR_VOL_SPACEUSED), or nil when the file system doesn't report it.
+    /// man 2 getattrlist: "On space sharing volumes, this value may not be identical to the difference between
+    /// the volume's size and its free space."
+    static func spaceUsed(byVolumeAt mountPath: CanonicalPath) -> UInt64? {
+        var request = attrlist()
+        request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
+        request.volattr = attrgroup_t(ATTR_VOL_INFO) | attrgroup_t(ATTR_VOL_SPACEUSED)
+        // A u_int32_t length, then the off_t; attributes are 4-byte aligned, so the value starts at offset 4.
+        var buffer = [UInt8](repeating: 0, count: 16)
+        let status = buffer.withUnsafeMutableBytes { getattrlist(mountPath.raw, &request, $0.baseAddress, $0.count, 0) }
+        guard status == 0 else { return nil }
+        let used = buffer.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: Int64.self) }
+        return used >= 0 ? UInt64(used) : nil
     }
 
     static func error(for code: Int32) -> DirectoryReadError {
