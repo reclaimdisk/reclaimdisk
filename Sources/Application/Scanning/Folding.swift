@@ -30,22 +30,25 @@ enum Folding {
                     newest[Int(folder)] = max(newest[Int(folder)], file.modified)
                 }
             }
-            var keep = Array(repeating: false, count: count)
-            for index in 0..<count where !table.excluded[index] {
-                keep[index] = index == 0
-                    || takes[index] >= options.minimumNodeSize.bytes
-                    || options.retainedDirectoryNames.contains(table.name[index])
-                    || table.markers[Int32(index)] != nil
-                    || table.largeFiles[Int32(index)] != nil
-            }
-            // Children always have larger indices than their parent, so a reverse pass is a post-order.
+            // Children always have larger indices than their parent, so a reverse pass is a post-order:
+            // first add up subtree totals, then decide what to keep from those totals.
             for index in stride(from: count - 1, to: 0, by: -1) where !table.excluded[index] {
                 let parent = Int(table.parent[index])
                 children[parent].append(Int32(index))
                 takes[parent] += takes[index]
                 frees[parent] += frees[index]
                 newest[parent] = max(newest[parent], newest[index])
-                if keep[index] { keep[parent] = true }
+            }
+            var keep = Array(repeating: false, count: count)
+            for index in 0..<count where !table.excluded[index] {
+                keep[index] = index == 0
+                    || takes[index] >= options.minimumNodeSize.bytes   // the folder's TOTAL, not just its own files
+                    || options.retainedDirectoryNames.contains(table.name[index])
+                    || table.markers[Int32(index)] != nil
+                    || table.largeFiles[Int32(index)] != nil
+            }
+            for index in stride(from: count - 1, to: 0, by: -1) where !table.excluded[index] && keep[index] {
+                keep[Int(table.parent[index])] = true   // ancestors of kept folders are kept
             }
             self.children = children
             totalTakesUp = takes

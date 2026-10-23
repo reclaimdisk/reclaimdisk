@@ -52,3 +52,16 @@ private func build(_ reader: FakeVolumeReader) async throws -> NodeDraft {
     let root = try await build(projectTree(withNodeModules: true))
     #expect(root.totalTakesUp == ByteCount.gibibyte + ByteCount.gibibyte + mib(7))
 }
+
+// Final review, Critical 1: keeping is decided on a folder's TOTAL, so a big folder made only of small subfolders stays visible.
+@Test func bigFolderMadeOfSmallSubfoldersIsKept() async throws {
+    let reader = FakeVolumeReader()
+    reader.directory(app, [Entry.dir("node_modules")])
+    reader.directory("\(app)/node_modules", (0..<20).map { Entry.dir("pkg\($0)") })
+    for i in 0..<20 { reader.directory("\(app)/node_modules/pkg\(i)", [Entry.file("index.js", allocated: mib(100), fileID: UInt64(100 + i))]) }
+    let root = try await build(reader)
+    let modules = root.child("node_modules")
+    #expect(!modules.isAggregate)
+    #expect(modules.totalTakesUp == mib(2_000))
+    #expect(modules.child("20 smaller folders").aggregateKind == .buildOutput)
+}
