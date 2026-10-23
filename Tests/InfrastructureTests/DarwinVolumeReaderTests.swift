@@ -143,3 +143,12 @@ private func entries(_ folder: TempFolder) throws -> [String: DirectoryEntry] {
     let folder = try TempFolder()   // keep it alive: its deinit deletes the folder
     #expect(try reader.mountPath(of: folder.path).raw == "/System/Volumes/Data")
 }
+
+/// On APFS, statfs reports the whole container's use for every volume. Each volume's own use must be smaller.
+@Test func capacityReportsEachVolumesOwnUse() throws {
+    let data = try reader.capacity(ofVolumeAt: CanonicalPath("/System/Volumes/Data")!)
+    #expect(data.usedByVolume.bytes < data.total.bytes - data.available.bytes)   // the System and Preboot volumes use space too
+    if let vm = try? reader.capacity(ofVolumeAt: CanonicalPath("/System/Volumes/VM")!) {
+        #expect(vm.usedByVolume < data.usedByVolume)
+    }
+}
