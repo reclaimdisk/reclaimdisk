@@ -15,9 +15,9 @@ enum Folding {
         let totalTakesUp: [UInt64]
         let newestTotal: [Int64]
         let keep: [Bool]
-        /// Link credit whose common ancestor is kept: that folder holds every link.
+        /// Link credit that stays on its common ancestor, which is kept and holds a link outside its aggregates.
         let keptCredit: [Int32: UInt64]
-        /// Link credit whose common ancestor is folded, by its nearest kept ancestor; placed once kinds are known.
+        /// Link credit whose links all fold into one kept folder's aggregates, by that folder; placed once kinds are known.
         let foldedCredits: [Int32: [DirectoryTable.LinkCredit]]
         /// Folders holding links of `foldedCredits`, whose kinds `fold` records.
         let linkFolders: Set<Int32>
@@ -55,15 +55,19 @@ enum Folding {
             }
             // Spec 8.3: a link's private bytes count only in a node that holds all its links, and the smallest such
             // node gets them, so its total always includes the inode's takes-up.
+            func nearestKept(_ folder: Int32) -> Int32 {
+                var current = folder
+                while !keep[Int(current)] { current = table.parent[Int(current)] }   // the root is always kept
+                return current
+            }
             var keptCredit: [Int32: UInt64] = [:], foldedCredits: [Int32: [DirectoryTable.LinkCredit]] = [:], linkFolders = Set<Int32>()
             for credit in table.linkCredits {
-                var home = credit.commonAncestor
-                while !keep[Int(home)] { home = table.parent[Int(home)] }   // the root is always kept
-                if home == credit.commonAncestor {
-                    keptCredit[home, default: 0] += credit.freesAtLeast
-                } else {
-                    foldedCredits[home, default: []].append(credit)
+                let home = nearestKept(credit.commonAncestor)
+                if credit.folders.allSatisfy({ !keep[Int($0)] && nearestKept($0) == home }) {
+                    foldedCredits[home, default: []].append(credit)   // every link folds into `home`'s aggregates
                     linkFolders.formUnion(credit.folders)
+                } else {
+                    keptCredit[home, default: 0] += credit.freesAtLeast
                 }
             }
             self.children = children

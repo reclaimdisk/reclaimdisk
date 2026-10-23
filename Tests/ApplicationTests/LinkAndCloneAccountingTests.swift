@@ -100,6 +100,22 @@ private func validated(_ result: ScanBuildResult) throws -> Scan {
     _ = try validated(result)
 }
 
+/// /D/p/node_modules/x and /D/q/node_modules/x are one inode. Their common ancestor /D is kept, but both links fold
+/// side by side into /D's one build-output aggregate: that aggregate is the smallest node holding them, so it gets the credit.
+@Test func hardLinksFoldedSideBySideCreditTheirAggregate() async throws {
+    let reader = FakeVolumeReader()
+    reader.directory("/D", [Entry.dir("p"), Entry.dir("q")])
+    reader.directory("/D/p", [Entry.dir("node_modules")])
+    reader.directory("/D/q", [Entry.dir("node_modules")])
+    reader.directory("/D/p/node_modules", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
+    reader.directory("/D/q/node_modules", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
+    let result = try await ScanBuilder(reader: reader, clock: FakeClock()).build(folding(), progress: { _ in })
+    let modules = try #require(result.root.children.first { $0.aggregateKind == .buildOutput })
+    #expect(modules.ownTakesUp == mib(1) && modules.ownFreesAtLeast == mib(1))
+    #expect(result.root.ownFreesAtLeast == .zero)
+    _ = try validated(result)
+}
+
 /// Random small trees with hard links between folders of mixed kinds, kept or folded at random thresholds:
 /// Scan validation never fails, and the root frees exactly the unlinked files' private bytes plus every fully found link.
 @Test(arguments: 0..<500) func hardLinksNeverBreakScanValidation(seed: Int) async throws {
