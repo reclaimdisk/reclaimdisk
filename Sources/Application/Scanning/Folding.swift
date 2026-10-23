@@ -79,6 +79,11 @@ enum Folding {
             self.linkFolders = linkFolders
         }
 
+        /// Int64.min is the table's "nothing dated here" value (APFS also clamps dates before 1677 to it).
+        static func instant(_ nanoseconds: Int64) -> Instant? {
+            nanoseconds == Int64.min ? nil : Instant(nanosecondsSince1970: nanoseconds)
+        }
+
         func kind(of folder: Int32, path: CanonicalPath, parentKind: Kind?) -> Kind {
             options.classifier.kind(for: path, name: table.name[Int(folder)], markers: table.markers[folder] ?? [], parentKind: parentKind)
         }
@@ -120,7 +125,7 @@ enum Folding {
                 let node = NodeDraft(
                     name: total.count == 1 ? "1 smaller folder" : "\(total.count) smaller folders", path: aggregatePath,
                     ownTakesUp: ByteCount(total.takes), ownFreesAtLeast: ByteCount(total.frees),
-                    newestChange: Instant(nanosecondsSince1970: total.newest), markers: [], isFile: false, isAggregate: true,
+                    newestChange: Self.instant(total.newest), markers: [], isFile: false, isAggregate: true,
                     aggregateKind: aggregateKind, children: []
                 )
                 drafts.append((total.takes, node))
@@ -130,7 +135,7 @@ enum Folding {
             return NodeDraft(
                 name: table.name[index], path: path,
                 ownTakesUp: ByteCount(table.ownTakesUp[index]), ownFreesAtLeast: ByteCount(ownFrees),
-                newestChange: Instant(nanosecondsSince1970: newestTotal[index]), markers: table.markers[folder] ?? [],
+                newestChange: Self.instant(newestTotal[index]), markers: table.markers[folder] ?? [],
                 isFile: false, isAggregate: false, aggregateKind: nil, children: drafts.map(\.draft)
             )
         }
