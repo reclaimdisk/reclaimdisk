@@ -1,7 +1,8 @@
 import SharedKernel
 
-/// Decides a folder's Kind. Rules run in a fixed order and the first match wins:
-/// specific rules, then the parent's kind, then location rules. Paths are user-facing.
+/// Decides a folder's Kind. Rules run in a fixed order and the first match wins: the tool rules (Docker, developer
+/// tools, macOS data, build output); then "inside build output stays build output"; then the cache and agent rules;
+/// then the parent's kind; then location rules. Paths are user-facing.
 public struct KindClassifier: Sendable {
     private let home: CanonicalPath
 
@@ -10,6 +11,12 @@ public struct KindClassifier: Sendable {
     public func kind(for path: CanonicalPath, name: String, markers: Set<String>, parentKind: Kind?) -> Kind {
         let subject = Subject(path: path, name: name, markers: markers, home: home)
         for rule in Self.specificRules {
+            if let kind = rule(subject) { return kind }
+        }
+        // One build folder covers its whole subtree, the way one CACHEDIR.TAG does. A scan root has no parent kind,
+        // so its ancestors' names decide.
+        if parentKind == .buildOutput || (parentKind == nil && subject.hasBuildOutputAncestor) { return .buildOutput }
+        for rule in Self.areaRules {
             if let kind = rule(subject) { return kind }
         }
         if let parentKind, parentKind != .other { return parentKind }   // rule 7: inherit
@@ -28,6 +35,9 @@ public struct KindClassifier: Sendable {
         { $0.under(["System", "Library", "AssetsV2", "com_apple_MobileAsset_iOSSimulatorRuntime"]) || $0.isUnderXcodeApp ? .developerTools : nil },
         { $0.under(["System"]) || ($0.under(["private", "var"]) && !$0.under(["private", "var", "folders"])) ? .macOSData : nil },
         { buildOutputNames.contains($0.name) || $0.markers.isSuperset(of: cargoMarkers) ? .buildOutput : nil },
+    ]
+
+    private static let areaRules: [Rule] = [
         { s in
             cacheNames.contains(s.name) || cacheNameSuffixes.contains { s.name.hasSuffix($0) }
                 || s.under(["private", "var", "folders"]) || s.underHome(cacheHomePaths) ? .caches : nil
@@ -54,7 +64,7 @@ public struct KindClassifier: Sendable {
     // MARK: vocabulary
 
     private static let cargoMarkers: Set<String> = ["CACHEDIR.TAG", ".rustc_info.json"]
-    private static let buildOutputNames: Set<String> = [
+    static let buildOutputNames: Set<String> = [
         "target", "node_modules", ".next", ".turbo", "dist", ".venv", "venv", "DerivedData", "__pycache__",
         ".parcel-cache", ".svelte-kit", ".nuxt", ".expo", "Pods",
     ]
@@ -106,6 +116,9 @@ private struct Subject {
         guard components.count >= sequence.count else { return false }
         return (0...(components.count - sequence.count)).contains { Array(components[$0..<($0 + sequence.count)]) == sequence }
     }
+
+    /// A folder above this one has a build-output name (node_modules, target, .venv …).
+    var hasBuildOutputAncestor: Bool { components.dropLast().contains { KindClassifier.buildOutputNames.contains($0) } }
 
     /// /private/tmp/claude-* and below.
     var isClaudeTemp: Bool {
