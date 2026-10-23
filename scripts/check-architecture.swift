@@ -63,15 +63,19 @@ func checkImports(allowed: Allowed, describePath: String, packageRoot: String) t
               let relativePath = target["path"] as? String else { continue }
         let allowedModules = allowed.edges[name] ?? []
         let root = URL(fileURLWithPath: packageRoot).appendingPathComponent(relativePath)
-        guard let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil) else {
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil) else {
             violations.append("\(name): source path \(root.path) not found")
             continue
         }
-        for case let file as URL in files where file.pathExtension == "swift" {
-            let contents = try String(contentsOf: file, encoding: .utf8)
+        let files = enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }.sorted { $0.path < $1.path }
+        var reported = Set<String>()
+        for file in files {
+            guard let code = codeOnly(try String(contentsOf: file, encoding: .utf8)) else {
+                violations.append("\(file.path): a comment or string never ends, so \(name)'s imports can't be checked")
+                continue
+            }
             var carried = ""
-            var reported = Set<String>()
-            for (index, line) in contents.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            for (index, line) in code.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 for piece in line.split(separator: ";", omittingEmptySubsequences: true) {
                     let statement = String(piece)
                     if statement.wholeMatch(of: attributeOnly) != nil {
@@ -95,10 +99,16 @@ func checkImports(allowed: Allowed, describePath: String, packageRoot: String) t
                     violations.append("\(file.path):\(index + 1): \(name) uses \(attribute), which reaches C symbols without an import")
                 }
             }
-            // Second pass: the compiler's own list of imports catches forms the line scan can't see
-            // (an import after a block comment, the module name on the next line, …).
-            for module in try compilerImports(of: file) where !allowedModules.contains(module) && !reported.contains(module) {
-                violations.append("\(file.path): \(name) imports \(module), which is not in its allowed edges")
+        }
+        // Second pass: the compiler's own list of imports catches forms the line scan can't see
+        // (the module name on the next line, an import inside #if, …). One call covers the whole target;
+        // files are named only when it finds something.
+        let found = try compilerImports(of: files).subtracting(allowedModules).subtracting(reported)
+        if !found.isEmpty {
+            for file in files {
+                for module in try compilerImports(of: [file]).intersection(found).sorted() {
+                    violations.append("\(file.path): \(name) imports \(module), which is not in its allowed edges")
+                }
             }
         }
     }
@@ -108,22 +118,155 @@ func checkImports(allowed: Allowed, describePath: String, packageRoot: String) t
 /// Attributes that call into C without any import statement; banned in domain targets.
 let bannedAttributes = ["@_silgen_name", "@_extern", "@_cdecl"]
 
-/// `swiftc -emit-imported-modules` parses the file and lists every imported module; it needs no module search paths.
-func compilerImports(of file: URL) throws -> [String] {
+/// The compilation conditions `swift build -v` passes to domain targets, in debug and in release (Swift 6.2).
+/// Domain targets declare no settings of their own (see `settings`), so every `#if` in them sees one of these sets.
+let buildConditions = [
+    ["SWIFT_PACKAGE", "DEBUG", "SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE"],
+    ["SWIFT_PACKAGE", "SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE"],
+]
+
+/// `swiftc -emit-imported-modules` parses the files and lists every imported module; it needs no module search paths.
+/// It runs once per build configuration, because an import inside `#if DEBUG` exists only in debug builds.
+func compilerImports(of files: [URL]) throws -> Set<String> {
+    guard !files.isEmpty else { return [] }
+    var modules = Set<String>()
+    for conditions in buildConditions {
+        let arguments = ["swiftc", "-emit-imported-modules", "-parse-as-library"] + conditions.flatMap { ["-D", $0] } + files.map(\.path)
+        let result = try run("/usr/bin/xcrun", arguments)
+        guard result.status == 0 else {
+            let message = String(decoding: result.errors.prefix(4_000), as: UTF8.self)
+            let names = files.map(\.path).joined(separator: ", ")
+            throw NSError(domain: "check-architecture", code: 2, userInfo: [NSLocalizedDescriptionKey: "swiftc couldn't list imports of \(names): \(message)"])
+        }
+        modules.formUnion(String(decoding: result.output, as: UTF8.self).split(separator: "\n").map(String.init))
+    }
+    return modules
+}
+
+/// Runs a tool to completion. Both pipes are read at once: reading one to the end first stalls a tool that
+/// fills the other pipe's buffer, and the check would never finish.
+func run(_ executable: String, _ arguments: [String]) throws -> (status: Int32, output: Data, errors: Data) {
     let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-    process.arguments = ["swiftc", "-emit-imported-modules", "-parse-as-library", file.path]
+    process.executableURL = URL(fileURLWithPath: executable)
+    process.arguments = arguments
     let output = Pipe(), errors = Pipe()
     process.standardOutput = output
     process.standardError = errors
     try process.run()
-    let data = output.fileHandleForReading.readDataToEndOfFile()
-    process.waitUntilExit()
-    guard process.terminationStatus == 0 else {
-        let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        throw NSError(domain: "check-architecture", code: 2, userInfo: [NSLocalizedDescriptionKey: "swiftc couldn't list imports of \(file.path): \(message)"])
+    var errorData = Data()
+    let errorsRead = DispatchSemaphore(value: 0)
+    DispatchQueue.global().async {
+        errorData = errors.fileHandleForReading.readDataToEndOfFile()
+        errorsRead.signal()
     }
-    return String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init).filter { !$0.isEmpty }
+    let outputData = output.fileHandleForReading.readDataToEndOfFile()
+    errorsRead.wait()
+    process.waitUntilExit()
+    return (process.terminationStatus, outputData, errorData)
+}
+
+/// `source` with comments and the text of string literals blanked out, so the line scan sees only code. Newlines stay,
+/// so line numbers still match. Follows Swift's lexical rules: block comments nest; strings may be multiline or
+/// `#`-delimited; an interpolation's code is kept; a `#/…/#` regex is skipped. Nil when a comment or string never ends.
+func codeOnly(_ source: String) -> String? {
+    var lexer = CodeLexer(bytes: Array(source.utf8))
+    guard lexer.code(inInterpolation: false) else { return nil }
+    return String(decoding: lexer.bytes, as: UTF8.self)
+}
+
+struct CodeLexer {
+    var bytes: [UInt8]
+    var i = 0
+
+    static let newline = UInt8(ascii: "\n"), space = UInt8(ascii: " "), quote = UInt8(ascii: "\""), hash = UInt8(ascii: "#")
+    static let slash = UInt8(ascii: "/"), backslash = UInt8(ascii: "\\"), open = UInt8(ascii: "("), close = UInt8(ascii: ")")
+
+    func at(_ k: Int, _ text: String) -> Bool {
+        let pattern = text.utf8
+        return k + pattern.count <= bytes.count && bytes[k..<(k + pattern.count)].elementsEqual(pattern)
+    }
+
+    func hashes(from k: Int) -> Int {
+        var n = 0
+        while k + n < bytes.count && bytes[k + n] == Self.hash { n += 1 }
+        return n
+    }
+
+    mutating func blank(_ range: Range<Int>) {
+        for k in range where bytes[k] != Self.newline { bytes[k] = Self.space }
+    }
+
+    /// Code up to the end, or up to the `)` that closes an interpolation. False when something never ends.
+    mutating func code(inInterpolation: Bool) -> Bool {
+        var depth = 0
+        while i < bytes.count {
+            if at(i, "//") {
+                let start = i
+                while i < bytes.count && bytes[i] != Self.newline { i += 1 }
+                blank(start..<i)
+            } else if at(i, "/*") {
+                let start = i
+                var nesting = 0
+                repeat {
+                    if at(i, "/*") { nesting += 1; i += 2 } else if at(i, "*/") { nesting -= 1; i += 2 } else { i += 1 }
+                } while nesting > 0 && i < bytes.count
+                guard nesting == 0 else { return false }
+                blank(start..<i)
+            } else if bytes[i] == Self.quote || bytes[i] == Self.hash {
+                let delimiter = hashes(from: i), next = i + delimiter
+                if next < bytes.count && bytes[next] == Self.quote {
+                    i = next
+                    guard string(delimiter: delimiter) else { return false }
+                } else if delimiter > 0 && next < bytes.count && bytes[next] == Self.slash {
+                    let start = next + 1   // a #/…/# regex may hold quotes: skip to its end
+                    i = start
+                    while i < bytes.count && !(bytes[i] == Self.slash && hashes(from: i + 1) >= delimiter) { i += 1 }
+                    guard i < bytes.count else { return false }
+                    blank(start..<i)
+                    i += 1 + delimiter
+                } else {
+                    i = next   // #if, #selector, …
+                }
+            } else {
+                if inInterpolation && bytes[i] == Self.open { depth += 1 }
+                if inInterpolation && bytes[i] == Self.close {
+                    if depth == 0 { i += 1; return true }
+                    depth -= 1
+                }
+                i += 1
+            }
+        }
+        return !inInterpolation
+    }
+
+    /// The string literal whose opening quote is at `i`, with `delimiter` number signs before it.
+    mutating func string(delimiter: Int) -> Bool {
+        let quotes = at(i, "\"\"\"") ? 3 : 1
+        i += quotes
+        var start = i
+        while i < bytes.count {
+            if bytes[i] == Self.backslash && hashes(from: i + 1) >= delimiter {
+                let after = i + 1 + delimiter
+                if after < bytes.count && bytes[after] == Self.open {
+                    blank(start..<(after + 1))
+                    i = after + 1
+                    guard code(inInterpolation: true) else { return false }
+                    start = i
+                } else {
+                    i = after + 1   // an escape: skip the escaped character
+                }
+            } else if (quotes == 3 ? at(i, "\"\"\"") : bytes[i] == Self.quote) && hashes(from: i + quotes) >= delimiter {
+                blank(start..<i)
+                i += quotes + delimiter
+                return true
+            } else if quotes == 1 && bytes[i] == Self.newline {
+                return false
+            } else {
+                i += 1
+            }
+        }
+        return false
+    }
 }
 
 // MARK: settings
