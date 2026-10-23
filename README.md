@@ -7,10 +7,10 @@
   - **frees at least**, what deleting it would certainly give back.
 
   Copies that share blocks (APFS clones) and hard links aren't counted twice.
-- **Nothing in use gets touched.** That matters from the cleaning slices on: anything that can't be verified counts as in use.
+- **Nothing in use gets touched.** That matters once cleaning arrives: anything that can't be verified counts as in use.
 - **It knows developer tools.** Build folders are recognized by their markers (for example Cargo's `CACHEDIR.TAG` + `.rustc_info.json`, whatever the folder is called), and each folder is sorted into a kind.
 
-> **Status: work in progress.** This version only scans and maps, and it never deletes anything. Cleaning arrives in later slices; see `.agent/Tasks/2026-10-21-v1-design.md`.
+> **Status: work in progress.** This version only scans and maps, and it never deletes anything. Finding cleanup candidates and cleaning them come in later versions.
 
 ## Build and run
 
@@ -41,6 +41,10 @@ Ideas, not code, from:
 - **[kondo](https://github.com/tbillington/kondo) and [npkill](https://github.com/voidcosmos/npkill):** project-type build artifacts.
 - **[GrandPerspective](https://grandperspectiv.sourceforge.net/) and Disk Inventory X:** the treemap.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for building, the checks and how the code is laid out ([docs/architecture.md](docs/architecture.md)).
+
 ## License
 
-Planned: Apache-2.0 (spec decision D2). The license file arrives before the first public release.
+[Apache License 2.0](LICENSE).
