@@ -8,6 +8,7 @@ struct ReclaimDiskCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: ProductInfo.commandName,
         abstract: "See where your Mac's disk space goes and reclaim it safely.",
+        version: ProductInfo.version,
         subcommands: [ScanCommand.self]
     )
 
