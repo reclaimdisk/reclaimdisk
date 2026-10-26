@@ -67,3 +67,13 @@ private func model(_ reader: FakeVolumeReader) -> ScanModel {
     #expect(m.state == .idle(lowDiskWarning: UserMessages.lowDiskWarning(available: mib(100), formatted: "100 MiB")))
     #expect(model(volume()).state == .idle(lowDiskWarning: nil))
 }
+
+@Test @MainActor func onlyAFolderScanOffersTheWholeVolumeNext() {
+    let m = model(volume())
+    #expect(!m.offersWholeVolumeScan)
+    m.start(ScanRequest(path: CanonicalPath("\(data)/Users")!))
+    #expect(m.offersWholeVolumeScan)
+    m.start()
+    #expect(!m.offersWholeVolumeScan)
+    m.cancel()
+}

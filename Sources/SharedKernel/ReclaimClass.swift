@@ -1,4 +1,4 @@
-/// How a candidate may be cleaned (spec section 5).
+/// How a candidate may be cleaned.
 public enum ReclaimClass: String, CaseIterable, Sendable {
     case rebuildable
     case toolManaged = "tool-managed"

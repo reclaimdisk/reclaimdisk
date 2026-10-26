@@ -102,7 +102,7 @@ public struct ScanBuilder: Sendable {
             }
         }
 
-        accounting.applyLinks(to: &table)   // before classification and folding (Task 8, rule 3)
+        accounting.applyLinks(to: &table)   // before classification and folding
         let rootDisplayPath = DisplayPath.forReadPath(options.root)
         let root = Folding.rootDraft(table: table, options: options, rootDisplayPath: rootDisplayPath)
         let unreadable = table.unreadable
@@ -123,7 +123,7 @@ public struct ScanBuilder: Sendable {
         case .notPermitted: .notPermitted
         case .nameTooLong: .pathTooLong
         case .other: .other
-        case .notFound, .notADirectory: nil
+        case .notFound, .notADirectory, .cloudOnly: nil   // gone, or nothing of it is on this Mac
         }
     }
 }

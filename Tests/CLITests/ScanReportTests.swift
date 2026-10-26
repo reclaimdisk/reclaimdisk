@@ -67,3 +67,21 @@ private func decode(_ text: String) throws -> [String: Any] {
     #expect(throws: CLIFailure.self) { try ScanCommand.resolvePath("/", currentDirectory: cwd) }
     #expect(throws: CLIFailure.self) { try ScanCommand.resolvePath("/private/tmp/reclaimdisk-missing-\(UUID().uuidString)", currentDirectory: cwd) }
 }
+
+@Test func textNamesFoldersThatCouldNotBeRead() throws {
+    let denied = UnreadableArea(path: CanonicalPath("/Users/u/Projects/locked")!, reason: .permissionDenied)
+    let locked = UnreadableArea(path: CanonicalPath("/Users/u/Library/Mail")!, reason: .notPermitted)
+    #expect(ScanReport.text(try makeScan(whole: true, unreadable: [denied, locked])).contains("1 folder couldn't be read, so it isn't counted. Run with --json to see which."))
+    #expect(!ScanReport.text(try makeScan(whole: true, unreadable: [locked])).contains("couldn't be read"))
+}
+
+@Test func unknownNewestChangeIsNull() throws {
+    let root = NodeDraft(name: "empty", path: CanonicalPath("/Users/u/empty")!, ownTakesUp: .zero, ownFreesAtLeast: .zero, newestChange: nil,
+                         markers: [], isFile: false, isAggregate: false, aggregateKind: nil, children: [])
+    let data = try VolumeCapacity(total: mib(100), available: mib(50), availableIncludingPurgeable: mib(50), usedByVolume: mib(40))
+    let scan = try Scan(volumeMountPath: CanonicalPath("/System/Volumes/Data")!, root: root, disk: DiskLayout(data: data, swapUsed: nil),
+                        startedAt: t0, finishedAt: t0, unreadable: [], scannedUniqueBytes: .zero, isWholeVolume: false, classifier: testClassifier)
+    let json = try #require(try JSONSerialization.jsonObject(with: Data(ScanReport.json(scan).utf8)) as? [String: Any])
+    let node = try #require(json["root"] as? [String: Any])
+    #expect(node["newestChange"] is NSNull)
+}

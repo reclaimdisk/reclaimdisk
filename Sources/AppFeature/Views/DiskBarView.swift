@@ -23,7 +23,7 @@ struct DiskBarView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(segments.map { "\(KindPalette.title(for: $0.part)) \(ByteText.nearest($0.bytes))" }.joined(separator: ", "))
+        .accessibilityLabel(segments.map { "\(KindPalette.title(for: $0.part)) \(ByteText.nearest($0.shownBytes))" }.joined(separator: ", "))
     }
 }
 

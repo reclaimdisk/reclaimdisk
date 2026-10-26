@@ -35,3 +35,10 @@ private func wholeVolumeScan(unique: UInt64, whole: Bool = true) throws -> Scan 
     #expect(segments.map(\.part) == [.kind(.caches), .kind(.projectSource), .kind(.apps)])
     #expect(segments.map(\.bytes.bytes) == [777, 333, 111])
 }
+
+@Test func keyShowsRealTakesUpWhileTheBarIsScaled() throws {
+    let segments = DiskBarModel.segments(for: try wholeVolumeScan(unique: 1_000))
+    #expect(segments.prefix(3).map(\.shownBytes.bytes) == [777, 333, 111])          // the CLI's takes-up
+    #expect(segments.prefix(3).reduce(0) { $0 + $1.bytes.bytes } == 1_000)          // the bar still fits the volume
+    #expect(segments.dropFirst(3).allSatisfy { $0.shownBytes == $0.bytes })
+}

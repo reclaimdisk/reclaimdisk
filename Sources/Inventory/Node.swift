@@ -9,7 +9,8 @@ public struct Node: Hashable, Sendable {
     public let footprint: Footprint
     public let ownTakesUp: ByteCount
     public let ownFreesAtLeast: ByteCount
-    public let newestChange: Instant
+    /// nil when the folder holds nothing with a date (an empty folder).
+    public let newestChange: Instant?
     public let markers: Set<String>
     public let isFile: Bool
     public let isAggregate: Bool

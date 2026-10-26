@@ -9,12 +9,12 @@ private func k(_ p: String, markers: Set<String> = [], parent: Kind? = nil) -> K
 }
 
 @Test func classifierTable() {
-    #expect(k("/Users/u/Movies/Demo.fcpbundle/x/Render Files", parent: .personalFiles) == .caches)          // 5 beats inherit
-    #expect(k("/Users/u/Movies/Demo.fcpbundle/x/Render Files/High Quality Media", parent: .caches) == .caches) // inherit beats 9
+    #expect(k("/Users/u/Movies/Demo.fcpbundle/x/Render Files", parent: .personalFiles) == .caches)          // the caches rule beats inheriting
+    #expect(k("/Users/u/Movies/Demo.fcpbundle/x/Render Files/High Quality Media", parent: .caches) == .caches) // inheriting beats the personal-files rule
     #expect(k("/Users/u/Projects/app/.worktrees", parent: .projectSource) == .agentSessions)
-    #expect(k("/Users/u/Projects/app/.worktrees/feat/svc", parent: .agentSessions) == .agentSessions)       // inherit beats 10
+    #expect(k("/Users/u/Projects/app/.worktrees/feat/svc", parent: .agentSessions) == .agentSessions)       // inheriting beats the project-source rule
     #expect(k("/Users/u/Projects/app/.worktrees/feat/svc/target", parent: .agentSessions) == .buildOutput)
-    #expect(k("/private/tmp/claude-501", parent: .other) == .agentSessions)                               // rule 6, third component
+    #expect(k("/private/tmp/claude-501", parent: .other) == .agentSessions)                               // the agent rule matches the third component
     #expect(k("/private/tmp/other-tool", parent: .other) == .other)
     #expect(k("/private/tmp/claude-501/p/s/scratchpad/fix3-target", markers: ["CACHEDIR.TAG", ".rustc_info.json"], parent: .agentSessions) == .buildOutput)
     #expect(k("/Users/u/Projects/app/retarget", parent: .projectSource) == .projectSource)                  // P3: no name pattern
@@ -42,4 +42,13 @@ private func k(_ p: String, markers: Set<String> = [], parent: Kind? = nil) -> K
     #expect(k("/Users/u/.docker", parent: .other) == .docker)
     #expect(k("/Users/u/Projects/app/.claude/worktrees/x", parent: .projectSource) == .agentSessions)
     #expect(k("/Users/u/Projects/app/node_modules", parent: .projectSource) == .buildOutput)
+}
+
+/// Build output keeps its kind all the way down, even inside caches and agent folders.
+@Test func insideBuildOutputStaysBuildOutput() {
+    #expect(k("/private/tmp/claude-501/s/proj/node_modules/left-pad", parent: .buildOutput) == .buildOutput)
+    #expect(k("/Users/u/.claude/worktrees/w/target/debug", parent: .buildOutput) == .buildOutput)
+    #expect(k("/Users/u/Library/Caches/tool/node_modules/x", parent: .buildOutput) == .buildOutput)
+    #expect(k("/private/tmp/claude-501/s/node_modules/left-pad", parent: nil) == .buildOutput)   // a scan root inside build output
+    #expect(k("/private/tmp/claude-501/s/app", parent: nil) == .agentSessions)
 }

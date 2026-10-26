@@ -3,13 +3,35 @@ import Darwin
 import Foundation
 import SharedKernel
 
-/// The real `VolumeReader`: getattrlistbulk for directories, lstat for single entries, statfs for capacity.
+/// The real `VolumeReader`: getattrlistbulk for directories, lstat for single entries, statfs and getattrlist for capacity.
 public struct DarwinVolumeReader: VolumeReader {
     private static let bufferSize = 256 * 1024
 
-    public init() {}
+    /// Also turns off materializing dataless (cloud-only) files for this process, so a scan never downloads anything.
+    /// Docs: man 3 getiopolicy_np. The man page calls OFF the system default, but without this call macOS 26.5 asked
+    /// the file provider for a cloud-only folder and timed out (ETIMEDOUT). With it, reading such a folder fails at
+    /// once with EDEADLK; that errno is observed, not documented.
+    public init() {
+        _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
+    }
 
     public func readDirectory(at path: CanonicalPath) throws(DirectoryReadError) -> [DirectoryEntry] {
+        try Self.retryingInterrupted { () throws(DirectoryReadError) in try readDirectoryOnce(at: path) }
+    }
+
+    /// Runs `body` again while it fails with EINTR, up to `attempts` times in all. Scans hit EINTR on ordinary folders
+    /// inside other apps' containers; a second read succeeds.
+    public static func retryingInterrupted<T>(attempts: Int = 5, _ body: () throws(DirectoryReadError) -> T) throws(DirectoryReadError) -> T {
+        var remaining = attempts
+        while true {
+            do { return try body() } catch {
+                remaining -= 1
+                guard error == .other(errno: EINTR), remaining > 0 else { throw error }
+            }
+        }
+    }
+
+    private func readDirectoryOnce(at path: CanonicalPath) throws(DirectoryReadError) -> [DirectoryEntry] {
         let fd = open(path.raw, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
         guard fd >= 0 else { throw Self.error(for: errno) }
         defer { close(fd) }
@@ -58,7 +80,8 @@ public struct DarwinVolumeReader: VolumeReader {
         let blockSize = UInt64(info.f_bsize)
         let total = UInt64(info.f_blocks) * blockSize
         let available = UInt64(info.f_bavail) * blockSize
-        let used = (UInt64(info.f_blocks) - UInt64(info.f_bfree)) * blockSize
+        // On APFS, statfs's f_blocks - f_bfree is the whole container's use, the same for every volume in it.
+        let used = Self.spaceUsed(byVolumeAt: mountPath) ?? (UInt64(info.f_blocks) - UInt64(info.f_bfree)) * blockSize
         // Docs: https://developer.apple.com/documentation/foundation/urlresourcekey/volumeavailablecapacityforimportantusagekey
         let important = (try? URL(fileURLWithPath: mountPath.raw)
             .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
@@ -71,10 +94,33 @@ public struct DarwinVolumeReader: VolumeReader {
         )
     }
 
-    static func error(for code: Int32) -> DirectoryReadError {
+    /// This volume's own use (getattrlist ATTR_VOL_SPACEUSED), or nil when the file system doesn't report it.
+    /// man 2 getattrlist: "On space sharing volumes, this value may not be identical to the difference between
+    /// the volume's size and its free space."
+    static func spaceUsed(byVolumeAt mountPath: CanonicalPath) -> UInt64? {
+        var request = attrlist()
+        request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
+        request.volattr = attrgroup_t(ATTR_VOL_INFO) | attrgroup_t(ATTR_VOL_SPACEUSED)
+        var buffer = [UInt8](repeating: 0, count: 16)
+        let status = buffer.withUnsafeMutableBytes { getattrlist(mountPath.raw, &request, $0.baseAddress, $0.count, 0) }
+        guard status == 0 else { return nil }
+        return buffer.withUnsafeBytes { spaceUsed(fromAttributes: $0) }
+    }
+
+    /// Reads ATTR_VOL_SPACEUSED from a getattrlist result: a u_int32_t length, then the off_t. Attributes are 4-byte
+    /// aligned, so the value starts at offset 4. Unsupported attributes are skipped, not packed (man 2 getattrlist),
+    /// so a length shorter than 12 means the file system didn't report it.
+    static func spaceUsed(fromAttributes buffer: UnsafeRawBufferPointer) -> UInt64? {
+        guard buffer.loadUnaligned(fromByteOffset: 0, as: UInt32.self) >= 12 else { return nil }
+        let used = buffer.loadUnaligned(fromByteOffset: 4, as: Int64.self)
+        return used >= 0 ? UInt64(used) : nil
+    }
+
+    public static func error(for code: Int32) -> DirectoryReadError {
         switch code {
         case EACCES: .permissionDenied
         case EPERM: .notPermitted
+        case EDEADLK: .cloudOnly
         case ENOENT: .notFound
         case ENOTDIR, ELOOP: .notADirectory
         case ENAMETOOLONG: .nameTooLong

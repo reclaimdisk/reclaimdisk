@@ -15,7 +15,9 @@ public struct TreemapCell: Identifiable, Equatable {
     /// 1...3 below the current node.
     public let depth: Int
     public let rect: CGRect
-    public let showsLabel: Bool
+    public let label: CellLabel
+
+    public var showsLabel: Bool { label.showsName }
 
     /// The node this cell stands for (for own files: the folder that holds them).
     public var node: Node {
@@ -25,6 +27,17 @@ public struct TreemapCell: Identifiable, Equatable {
     }
 
     public var isOwnFiles: Bool { if case .ownFiles = content { true } else { false } }
+}
+
+/// How a cell's label fits its rectangle.
+public struct CellLabel: Equatable, Sendable {
+    public let showsName: Bool
+    /// The size shows only where it fits beside or below the name, so it never wraps or clips.
+    public let showsSize: Bool
+    /// Name above size (two lines); otherwise one line.
+    public let isStacked: Bool
+
+    static let hidden = CellLabel(showsName: false, showsSize: false, isStacked: false)
 }
 
 public enum NestedTreemap {
@@ -69,7 +82,7 @@ public enum NestedTreemap {
         for (index, cellRect) in placed where cellRect.width >= 0.5 && cellRect.height >= 0.5 {
             let content = entries[index].content
             let slot = result.count
-            result.append(TreemapCell(id: "", content: content, depth: depth, rect: cellRect, showsLabel: false))   // replaced below
+            result.append(TreemapCell(id: "", content: content, depth: depth, rect: cellRect, label: .hidden))   // replaced below
             var isGroup = false
             if depth < 3, case .node(let child) = content, !child.isAggregate, !child.children.isEmpty {
                 let header: CGFloat = depth == 1 ? 20 : 16
@@ -80,7 +93,7 @@ public enum NestedTreemap {
                 isGroup = result.count > before
             }
             result[slot] = TreemapCell(id: id(for: content), content: content, depth: depth, rect: cellRect,
-                                       showsLabel: showsLabel(depth: depth, isGroup: isGroup, size: cellRect.size))
+                                       label: label(depth: depth, isGroup: isGroup, size: cellRect.size))
         }
     }
 
@@ -91,11 +104,19 @@ public enum NestedTreemap {
         }
     }
 
-    private static func showsLabel(depth: Int, isGroup: Bool, size: CGSize) -> Bool {
-        switch (depth, isGroup) {
+    /// Names need 46×16 pt (depth 1), 50×14 pt (depth-2 group headers) or 58×32 pt (depth 2 and 3 leaves). Leaves at
+    /// least 32 pt tall stack the size under the name; everything else gets one line, with the size only from 110 pt wide.
+    public static func label(depth: Int, isGroup: Bool, size: CGSize) -> CellLabel {
+        let showsName = switch (depth, isGroup) {
         case (1, _): size.width >= 46 && size.height >= 16
         case (2, true): size.width >= 50 && size.height >= 14
         default: size.width >= 58 && size.height >= 32
         }
+        guard showsName else { return .hidden }
+        let isStacked = !isGroup && size.height >= 32
+        return CellLabel(showsName: true, showsSize: (isStacked && size.width >= minimumSizeWidth) || size.width >= 110, isStacked: isStacked)
     }
+
+    /// The narrowest cell that fits a size on its own line: "8888.8 GiB" at 10 pt plus 4 pt padding on each side.
+    public static let minimumSizeWidth: CGFloat = 64
 }

@@ -1,4 +1,4 @@
-/// What a folder is for, as shown on the map (spec section 5). Raw values are the JSON names.
+/// What a folder is for, as shown on the map. Raw values are the JSON names.
 public enum Kind: String, CaseIterable, Sendable {
     case buildOutput = "build-output"
     case caches

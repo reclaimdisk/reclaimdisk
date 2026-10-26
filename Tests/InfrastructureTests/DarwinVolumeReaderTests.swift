@@ -1,7 +1,7 @@
 import Application
 import Darwin
 import Foundation
-import Infrastructure
+@testable import Infrastructure
 import SharedKernel
 import Testing
 
@@ -142,4 +142,47 @@ private func entries(_ folder: TempFolder) throws -> [String: DirectoryEntry] {
     #expect(try reader.mountPath(of: CanonicalPath("/Users")!).raw == "/System/Volumes/Data")
     let folder = try TempFolder()   // keep it alive: its deinit deletes the folder
     #expect(try reader.mountPath(of: folder.path).raw == "/System/Volumes/Data")
+}
+
+/// On APFS, statfs reports the whole container's use for every volume. Each volume's own use must be smaller.
+@Test func capacityReportsEachVolumesOwnUse() throws {
+    let data = try reader.capacity(ofVolumeAt: CanonicalPath("/System/Volumes/Data")!)
+    #expect(data.usedByVolume.bytes < data.total.bytes - data.available.bytes)   // the System and Preboot volumes use space too
+    if let vm = try? reader.capacity(ofVolumeAt: CanonicalPath("/System/Volumes/VM")!) {
+        #expect(vm.usedByVolume < data.usedByVolume)
+    }
+}
+
+@Test func interruptedReadsAreRetried() throws {
+    var calls = 0
+    let value = try DarwinVolumeReader.retryingInterrupted { () throws(DirectoryReadError) -> Int in
+        calls += 1
+        if calls < 3 { throw .other(errno: EINTR) }
+        return 7
+    }
+    #expect(value == 7 && calls == 3)
+}
+
+@Test func retriesStopAtTheLimitAndOnOtherErrors() {
+    var calls = 0
+    #expect(throws: DirectoryReadError.other(errno: EINTR)) {
+        try DarwinVolumeReader.retryingInterrupted(attempts: 4) { () throws(DirectoryReadError) -> Int in calls += 1; throw .other(errno: EINTR) }
+    }
+    #expect(calls == 4)
+    calls = 0
+    #expect(throws: DirectoryReadError.notPermitted) {
+        try DarwinVolumeReader.retryingInterrupted { () throws(DirectoryReadError) -> Int in calls += 1; throw .notPermitted }
+    }
+    #expect(calls == 1)
+}
+
+@Test func cloudOnlyFoldersHaveTheirOwnError() {
+    #expect(DarwinVolumeReader.error(for: EDEADLK) == .cloudOnly)
+}
+
+/// man 2 getattrlist: unsupported attributes are skipped, not packed, so only the length word comes back.
+@Test func skippedSpaceUsedFallsBackToStatfs() {
+    func used(_ bytes: [UInt8]) -> UInt64? { bytes.withUnsafeBytes { DarwinVolumeReader.spaceUsed(fromAttributes: $0) } }
+    #expect(used([4, 0, 0, 0] + [UInt8](repeating: 0, count: 12)) == nil)
+    #expect(used([12, 0, 0, 0, 0xD2, 0x04, 0, 0, 0, 0, 0, 0] + [UInt8](repeating: 0, count: 4)) == 1234)
 }

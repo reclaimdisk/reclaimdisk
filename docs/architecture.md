@@ -11,10 +11,10 @@ ReclaimDisk is one Swift package. The domain follows domain-driven design where 
 | SharedKernel | ByteCount, CanonicalPath, Instant, Kind, ReclaimClass, Target | — |
 | Inventory | Scan, Node, NodeDraft, Footprint, KindTotal, VolumeCapacity, DiskLayout, UnreadableArea, KindClassifier | SharedKernel |
 | Catalog, Cleanup, Ledger | Empty namespaces until finding and cleaning candidates arrive | SharedKernel |
-| Application | Ports, scanning (ScanBuilder, ReadPool, Folding, LinkAndCloneAccounting), RunScan, UserMessages, ByteFormatting, KindTitles | SharedKernel + the four contexts |
-| Infrastructure | DarwinVolumeReader (getattrlistbulk, lstat, statfs), PathResolver (realpath), SystemWallClock | SharedKernel, Inventory, Application |
-| CLI | `reclaimdisk scan` (swift-argument-parser) | SharedKernel, Inventory, Application, Infrastructure, ArgumentParser |
-| AppFeature | ScanModel, DiskBarModel, KindPalette, treemap layout and views | SharedKernel, Inventory, Application, Infrastructure |
+| Application | Ports, scanning (ScanBuilder, ReadPool, Folding, LinkAndCloneAccounting), RunScan, UserMessages, ByteFormatting, KindTitles, DisplayText, ProductInfo | SharedKernel + the four contexts |
+| Infrastructure | DarwinVolumeReader (getattrlistbulk, lstat, statfs, getattrlist), PathResolver (realpath), SystemWallClock | SharedKernel, Inventory, Application |
+| CLI | `reclaimdisk scan` and `--version` (swift-argument-parser) | SharedKernel, Inventory, Application, Infrastructure, ArgumentParser |
+| AppFeature | ScanModel, DiskBarModel, KindPalette, LockedFolders, `Node.displayName`, treemap layout and views | SharedKernel, Inventory, Application, Infrastructure |
 | ReclaimDiskApp | `@main` only | AppFeature |
 | TestSupport | FakeVolumeReader, FakeClock, test builders (test targets only) | SharedKernel, Inventory, Application |
 
@@ -36,11 +36,12 @@ ReclaimDisk is one Swift package. The domain follows domain-driven design where 
 
 ## Scanning, in order
 
-1. **RunScan** reads the disk layout (`statfs` on the Data and VM volumes) and checks a `--path` folder: it exists, is a directory, and is mounted on the Data volume (the System volume shares its device id, so the mount decides).
+1. **RunScan** reads the disk layout (each volume's own use from `getattrlist` `ATTR_VOL_SPACEUSED`; on APFS, `statfs` reports the whole container's use for every volume) and checks a `--path` folder: it exists, is a directory, and is mounted on the Data volume (the System volume shares its device id, so the mount decides).
 2. **ScanBuilder** walks breadth-first:
    - at most `maxConcurrentReads` reads in flight;
    - every blocking call goes through `ReadPool` (a private concurrent DispatchQueue), never Swift's cooperative pool;
-   - it never descends into mount points, other devices or symlinks.
+   - it never descends into mount points, other devices or symlinks;
+   - `DarwinVolumeReader` retries a read interrupted with EINTR, and turns off downloading cloud-only (dataless) files for the process, so such folders fail at once and count as zero.
 3. **DirectoryTable** keeps one compact row per folder plus large files (≥ 0.25 GiB), never every file.
 4. **LinkAndCloneAccounting:**
    - a hard-linked inode counts once, in the folder of its first path;
