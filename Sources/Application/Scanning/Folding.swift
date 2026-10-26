@@ -115,7 +115,7 @@ enum Folding {
                 guard let filePath = path.appending(file.name) else { continue }
                 let node = NodeDraft(
                     name: file.name, path: filePath, ownTakesUp: ByteCount(file.takesUp), ownFreesAtLeast: ByteCount(file.freesAtLeast),
-                    newestChange: Instant(nanosecondsSince1970: file.modified), markers: [], isFile: true, isAggregate: false,
+                    newestChange: Self.instant(file.modified), markers: [], isFile: true, isAggregate: false,
                     aggregateKind: nil, children: []
                 )
                 drafts.append((file.takesUp, node))

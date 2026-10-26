@@ -160,6 +160,15 @@ private final class LastValue<T: Sendable>: @unchecked Sendable {
     #expect(result.root.totalTakesUp == mib(1))
 }
 
+/// APFS clamps dates before 1677 to Int64.min nanoseconds, the table's "no date" value.
+@Test func largeFileWithAClampedDateHasNoNewestChange() async throws {
+    let reader = FakeVolumeReader()
+    reader.directory("/S", [Entry.file("old.raw", allocated: big, fileID: 1, modified: Instant(nanosecondsSince1970: Int64.min))])
+    let root = try await build(reader, ScanOptions(root: CanonicalPath("/S")!, classifier: testClassifier)).root
+    #expect(root.child("old.raw").newestChange == nil)
+    #expect(root.newestChange == nil)
+}
+
 @Test func emptyFolderHasNoNewestChange() async throws {
     let reader = FakeVolumeReader()
     reader.directory("/S", [])
