@@ -1,7 +1,7 @@
 import Application
 import Darwin
 import Foundation
-import Infrastructure
+@testable import Infrastructure
 import SharedKernel
 import Testing
 
@@ -178,4 +178,11 @@ private func entries(_ folder: TempFolder) throws -> [String: DirectoryEntry] {
 
 @Test func cloudOnlyFoldersHaveTheirOwnError() {
     #expect(DarwinVolumeReader.error(for: EDEADLK) == .cloudOnly)
+}
+
+/// man 2 getattrlist: unsupported attributes are skipped, not packed, so only the length word comes back.
+@Test func skippedSpaceUsedFallsBackToStatfs() {
+    func used(_ bytes: [UInt8]) -> UInt64? { bytes.withUnsafeBytes { DarwinVolumeReader.spaceUsed(fromAttributes: $0) } }
+    #expect(used([4, 0, 0, 0] + [UInt8](repeating: 0, count: 12)) == nil)
+    #expect(used([12, 0, 0, 0, 0xD2, 0x04, 0, 0, 0, 0, 0, 0] + [UInt8](repeating: 0, count: 4)) == 1234)
 }
