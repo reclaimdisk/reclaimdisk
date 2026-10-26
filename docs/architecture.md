@@ -11,10 +11,10 @@ ReclaimDisk is one Swift package. The domain follows domain-driven design where 
 | SharedKernel | ByteCount, CanonicalPath, Instant, Kind, ReclaimClass, Target | — |
 | Inventory | Scan, Node, NodeDraft, Footprint, KindTotal, VolumeCapacity, DiskLayout, UnreadableArea, KindClassifier | SharedKernel |
 | Catalog, Cleanup, Ledger | Empty namespaces until finding and cleaning candidates arrive | SharedKernel |
-| Application | Ports, scanning (ScanBuilder, ReadPool, Folding, LinkAndCloneAccounting), RunScan, UserMessages, ByteFormatting, KindTitles | SharedKernel + the four contexts |
+| Application | Ports, scanning (ScanBuilder, ReadPool, Folding, LinkAndCloneAccounting), RunScan, UserMessages, ByteFormatting, KindTitles, DisplayText, ProductInfo | SharedKernel + the four contexts |
 | Infrastructure | DarwinVolumeReader (getattrlistbulk, lstat, statfs, getattrlist), PathResolver (realpath), SystemWallClock | SharedKernel, Inventory, Application |
-| CLI | `reclaimdisk scan` (swift-argument-parser) | SharedKernel, Inventory, Application, Infrastructure, ArgumentParser |
-| AppFeature | ScanModel, DiskBarModel, KindPalette, treemap layout and views | SharedKernel, Inventory, Application, Infrastructure |
+| CLI | `reclaimdisk scan` and `--version` (swift-argument-parser) | SharedKernel, Inventory, Application, Infrastructure, ArgumentParser |
+| AppFeature | ScanModel, DiskBarModel, KindPalette, LockedFolders, `Node.displayName`, treemap layout and views | SharedKernel, Inventory, Application, Infrastructure |
 | ReclaimDiskApp | `@main` only | AppFeature |
 | TestSupport | FakeVolumeReader, FakeClock, test builders (test targets only) | SharedKernel, Inventory, Application |
 
