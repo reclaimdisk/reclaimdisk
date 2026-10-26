@@ -2,7 +2,7 @@ import Inventory
 import SharedKernel
 
 /// Everything the scan keeps per folder, as parallel arrays indexed by folder number.
-/// Only folders and large files are stored, never every file, which keeps memory small (spec criterion 4).
+/// Only folders and large files are stored, never every file, which keeps memory small on a whole-volume scan.
 /// A folder's index is always larger than its parent's, so a reverse pass is a valid post-order.
 struct DirectoryTable {
     struct LargeFile {
