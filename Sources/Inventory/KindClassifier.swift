@@ -19,11 +19,11 @@ public struct KindClassifier: Sendable {
         for rule in Self.areaRules {
             if let kind = rule(subject) { return kind }
         }
-        if let parentKind, parentKind != .other { return parentKind }   // rule 7: inherit
+        if let parentKind, parentKind != .other { return parentKind }   // inherit the parent's kind
         for rule in Self.locationRules {
             if let kind = rule(subject) { return kind }
         }
-        return parentKind ?? .other                                      // rule 12
+        return parentKind ?? .other                                      // nothing matched
     }
 
     // MARK: rules, in order
