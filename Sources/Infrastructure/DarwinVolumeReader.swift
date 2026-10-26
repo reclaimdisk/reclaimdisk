@@ -101,11 +101,18 @@ public struct DarwinVolumeReader: VolumeReader {
         var request = attrlist()
         request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
         request.volattr = attrgroup_t(ATTR_VOL_INFO) | attrgroup_t(ATTR_VOL_SPACEUSED)
-        // A u_int32_t length, then the off_t; attributes are 4-byte aligned, so the value starts at offset 4.
         var buffer = [UInt8](repeating: 0, count: 16)
         let status = buffer.withUnsafeMutableBytes { getattrlist(mountPath.raw, &request, $0.baseAddress, $0.count, 0) }
         guard status == 0 else { return nil }
-        let used = buffer.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: Int64.self) }
+        return buffer.withUnsafeBytes { spaceUsed(fromAttributes: $0) }
+    }
+
+    /// Reads ATTR_VOL_SPACEUSED from a getattrlist result: a u_int32_t length, then the off_t. Attributes are 4-byte
+    /// aligned, so the value starts at offset 4. Unsupported attributes are skipped, not packed (man 2 getattrlist),
+    /// so a length shorter than 12 means the file system didn't report it.
+    static func spaceUsed(fromAttributes buffer: UnsafeRawBufferPointer) -> UInt64? {
+        guard buffer.loadUnaligned(fromByteOffset: 0, as: UInt32.self) >= 12 else { return nil }
+        let used = buffer.loadUnaligned(fromByteOffset: 4, as: Int64.self)
         return used >= 0 ? UInt64(used) : nil
     }
 
