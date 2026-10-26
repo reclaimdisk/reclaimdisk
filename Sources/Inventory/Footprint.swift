@@ -1,6 +1,6 @@
 import SharedKernel
 
-/// Two sizes for one node (spec section 5): "takes up" (allocated, each inode once) and
+/// Two sizes for one node: "takes up" (allocated, each inode once) and
 /// "frees at least" (bytes deleting it would certainly free). Invariant: freesAtLeast <= takesUp.
 public struct Footprint: Hashable, Sendable {
     public let takesUp: ByteCount

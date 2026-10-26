@@ -7,8 +7,10 @@ import SharedKernel
 public struct DarwinVolumeReader: VolumeReader {
     private static let bufferSize = 256 * 1024
 
-    /// Also turns off materializing dataless (cloud-only) files for this process, so a scan never downloads anything:
-    /// reading such a folder fails at once instead (EDEADLK on macOS 26). Docs: man 3 getiopolicy_np.
+    /// Also turns off materializing dataless (cloud-only) files for this process, so a scan never downloads anything.
+    /// Docs: man 3 getiopolicy_np. The man page calls OFF the system default, but without this call macOS 26.5 asked
+    /// the file provider for a cloud-only folder and timed out (ETIMEDOUT). With it, reading such a folder fails at
+    /// once with EDEADLK; that errno is observed, not documented.
     public init() {
         _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
     }
