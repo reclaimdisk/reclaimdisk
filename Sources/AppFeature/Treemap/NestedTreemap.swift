@@ -114,6 +114,9 @@ public enum NestedTreemap {
         }
         guard showsName else { return .hidden }
         let isStacked = !isGroup && size.height >= 32
-        return CellLabel(showsName: true, showsSize: isStacked || size.width >= 110, isStacked: isStacked)
+        return CellLabel(showsName: true, showsSize: (isStacked && size.width >= minimumSizeWidth) || size.width >= 110, isStacked: isStacked)
     }
+
+    /// The narrowest cell that fits a size on its own line: "8888.8 GiB" at 10 pt plus 4 pt padding on each side.
+    public static let minimumSizeWidth: CGFloat = 64
 }

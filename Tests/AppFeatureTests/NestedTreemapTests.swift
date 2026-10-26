@@ -1,4 +1,5 @@
 import AppFeature
+import AppKit
 import CoreGraphics
 import Inventory
 import SharedKernel
@@ -75,7 +76,16 @@ private func cell(_ cells: [TreemapCell], _ id: String) throws -> TreemapCell { 
     #expect(wideHeader.showsName && wideHeader.showsSize && !wideHeader.isStacked)
     let shortLeaf = NestedTreemap.label(depth: 1, isGroup: false, size: CGSize(width: 90, height: 20))
     #expect(shortLeaf.showsName && !shortLeaf.showsSize && !shortLeaf.isStacked)   // two lines wouldn't fit 20 pt
-    let tallLeaf = NestedTreemap.label(depth: 3, isGroup: false, size: CGSize(width: 60, height: 40))
+    let tallLeaf = NestedTreemap.label(depth: 3, isGroup: false, size: CGSize(width: 70, height: 40))
     #expect(tallLeaf.showsName && tallLeaf.showsSize && tallLeaf.isStacked)
+    let narrowTallLeaf = NestedTreemap.label(depth: 1, isGroup: false, size: CGSize(width: 50, height: 40))
+    #expect(narrowTallLeaf.showsName && !narrowTallLeaf.showsSize && narrowTallLeaf.isStacked)   // "888.8 GiB" needs 57 pt
     #expect(!NestedTreemap.label(depth: 3, isGroup: false, size: CGSize(width: 40, height: 40)).showsName)
+}
+
+/// MapView draws sizes in the 10 pt monospaced-digit system font with 4 pt padding on each side.
+@Test func theWidestSizeFitsTheMinimumWidth() {
+    let font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
+    let widest = ("8888.8 GiB" as NSString).size(withAttributes: [.font: font]).width
+    #expect(widest + 8 <= NestedTreemap.minimumSizeWidth)
 }
