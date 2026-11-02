@@ -90,3 +90,37 @@ private func write(_ text: String, to url: URL, modified: Date) throws {
     #expect(state.ignoredNonBuildPaths.isEmpty)
     #expect(!state.hasChanges)
 }
+
+/// Reading a worktree must not run a program the repository's configuration names: `core.fsmonitor` would start one on
+/// every `git status`.
+@Test func readingAWorktreeNeverRunsItsFsmonitorHook() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    func git(_ arguments: [String], in directory: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", directory.path] + arguments
+        process.environment = ["GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid", "GIT_COMMITTER_NAME": "t",
+                               "GIT_COMMITTER_EMAIL": "t@example.invalid", "HOME": root.path, "PATH": "/usr/bin:/bin"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0, "git \(arguments.joined(separator: " "))")
+    }
+    let repo = root.appendingPathComponent("app")
+    try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+    try git(["init", "-q", "-b", "main"], in: repo)
+    try write("x\n", to: repo.appendingPathComponent("file.txt"), modified: Date())
+    try git(["add", "."], in: repo)
+    try git(["commit", "-q", "-m", "init"], in: repo)
+    let worktree = repo.appendingPathComponent(".worktrees/feat")
+    try git(["worktree", "add", "-q", "-b", "feat", worktree.path], in: repo)
+    let marker = root.appendingPathComponent("hook-ran")
+    let hook = root.appendingPathComponent("fsmonitor-hook")
+    try write("#!/bin/sh\ntouch '\(marker.path)'\n", to: hook, modified: Date())
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
+    try git(["config", "core.fsmonitor", hook.path], in: repo)
+    _ = LiveGitRecords().worktree(at: CanonicalPath(worktree.path)!)
+    #expect(!FileManager.default.fileExists(atPath: marker.path))
+}

@@ -18,3 +18,10 @@ import Testing
     #expect(output?.status == 0)
     #expect(output?.standardOutput.count == 1_000_000)
 }
+
+/// A query never inherits the caller's folder, so a project's own tool settings (an `.npmrc` beside the shell) can't
+/// redirect what a tool reports.
+@Test func aCommandRunsFromTheRootFolder() {
+    let output = ToolCacheCommand.run(executable: "/bin/pwd", arguments: [], environment: [:], timeout: .seconds(10))
+    #expect(output?.standardOutput == "/\n")
+}
