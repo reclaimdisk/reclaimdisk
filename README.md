@@ -10,7 +10,7 @@
 - **Nothing in use gets touched.** That matters once cleaning arrives: anything that can't be verified counts as in use.
 - **It knows developer tools.** Build folders are recognized by their markers (for example Cargo's `CACHEDIR.TAG` + `.rustc_info.json`, whatever the folder is called), and each folder is sorted into a kind.
 
-> **Status: work in progress.** This version only scans and maps, and it never deletes anything. Finding cleanup candidates and cleaning them come in later versions.
+> **Status: work in progress.** This version scans, maps, and lists cleanup candidates. It never deletes anything.
 
 ## Build and run
 
@@ -21,13 +21,15 @@ swift build -c release
 .build/release/reclaimdisk scan                  # whole Data volume
 .build/release/reclaimdisk scan --path ~/Projects
 .build/release/reclaimdisk scan --path . --json  # JSON schema 1
+.build/release/reclaimdisk candidates --path ~/Projects
+.build/release/reclaimdisk candidates --path . --json
 swift run ReclaimDiskApp                         # the app: Overview and Map
 scripts/ci.sh                                    # all checks
 ```
 
 ## Honest limits
 
-- **Read-only** in this version.
+- **Read-only** in this version. `candidates` only lists what a later cleanup could remove, and a folder changed in the last 24 hours stays visible but is not preselected.
 - **"Frees at least" is a lower bound.** Blocks shared only between files you'd delete together aren't credited yet.
 - **Locked folders.** Some folders (Mail, Messages, Safari) need Full Disk Access to be counted: System Settings › Privacy & Security › Full Disk Access.
 - **"Not counted" space.** System-only folders, file-system metadata and snapshots stay uncounted, and the app shows them as "Not counted".

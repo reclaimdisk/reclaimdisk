@@ -10,13 +10,14 @@ ReclaimDisk is one Swift package. The domain follows domain-driven design where 
 |---|---|---|
 | SharedKernel | ByteCount, CanonicalPath, Instant, Kind, ReclaimClass, Target | — |
 | Inventory | Scan, Node, NodeDraft, Footprint, KindTotal, VolumeCapacity, DiskLayout, UnreadableArea, KindClassifier | SharedKernel |
-| Catalog, Cleanup, Ledger | Empty namespaces until finding and cleaning candidates arrive | SharedKernel |
-| Application | Ports, scanning (ScanBuilder, ReadPool, Folding, LinkAndCloneAccounting), RunScan, UserMessages, ByteFormatting, KindTitles, DisplayText, ProductInfo | SharedKernel + the four contexts |
-| Infrastructure | DarwinVolumeReader (getattrlistbulk, lstat, statfs, getattrlist), PathResolver (realpath), SystemWallClock | SharedKernel, Inventory, Application |
-| CLI | `reclaimdisk scan` and `--version` (swift-argument-parser) | SharedKernel, Inventory, Application, Infrastructure, ArgumentParser |
-| AppFeature | ScanModel, DiskBarModel, KindPalette, LockedFolders, `Node.displayName`, treemap layout and views | SharedKernel, Inventory, Application, Infrastructure |
+| Catalog | Candidate, evidence, estimates, and the scan rules (Rust build folders, Node dependencies, JavaScript build caches, Python environments) | SharedKernel |
+| Cleanup, Ledger | Empty namespaces until cleaning and its record arrive | SharedKernel |
+| Application | Ports, scanning (ScanBuilder, ReadPool, Folding, LinkAndCloneAccounting), RunScan, ScanCatalogQuery, ProposeCandidates, UserMessages, ByteFormatting, KindTitles, DisplayText, ProductInfo | SharedKernel + the four contexts |
+| Infrastructure | DarwinVolumeReader (getattrlistbulk, lstat, statfs, getattrlist), PathResolver (realpath), SystemWallClock, LiveCatalog | SharedKernel, Inventory, Catalog, Application |
+| CLI | `reclaimdisk scan`, `reclaimdisk candidates` and `--version` (swift-argument-parser) | SharedKernel, Inventory, Catalog, Application, Infrastructure, ArgumentParser |
+| AppFeature | ScanModel, DiskBarModel, KindPalette, LockedFolders, `Node.displayName`, treemap layout and views | SharedKernel, Inventory, Catalog, Application, Infrastructure |
 | ReclaimDiskApp | `@main` only | AppFeature |
-| TestSupport | FakeVolumeReader, FakeClock, test builders (test targets only) | SharedKernel, Inventory, Application |
+| TestSupport | FakeVolumeReader, FakeClock, test builders (test targets only) | SharedKernel, Inventory, Catalog, Application |
 
 ## Where DDD applies
 
@@ -33,6 +34,7 @@ ReclaimDisk is one Swift package. The domain follows domain-driven design where 
 |---|---|---|
 | `VolumeReader` (readDirectory, entryType, deviceID, mountPath, capacity) | Application | `DarwinVolumeReader`; `FakeVolumeReader` in tests |
 | `WallClock` | Application | `SystemWallClock`; `FakeClock` in tests |
+| `ScanQuery` (folders of a finished scan) | Catalog | `ScanCatalogQuery` |
 
 ## Scanning, in order
 
@@ -42,15 +44,16 @@ ReclaimDisk is one Swift package. The domain follows domain-driven design where 
    - every blocking call goes through `ReadPool` (a private concurrent DispatchQueue), never Swift's cooperative pool;
    - it never descends into mount points, other devices or symlinks;
    - `DarwinVolumeReader` retries a read interrupted with EINTR, and turns off downloading cloud-only (dataless) files for the process, so such folders fail at once and count as zero.
-3. **DirectoryTable** keeps one compact row per folder plus large files (≥ 0.25 GiB), never every file.
+3. **DirectoryTable** keeps one compact row per folder plus large files (≥ 0.25 GiB), never every file. Two kinds of marker are recorded on a folder: force-kept names (`CACHEDIR.TAG`, `.rustc_info.json`) and project files (package.json, lockfiles, `pyvenv.cfg`, `Cargo.toml`, and the Gradle build files). Only the force-kept names keep a folder. Dependency and cache directories (`node_modules`, `.next`, `.turbo`, `.parcel-cache`, `.svelte-kit`, `.nuxt`, `.venv`, `venv`) are kept when their total is at least 1 MiB and no ancestor below the scan root already has one of those names or a force-kept marker.
 4. **LinkAndCloneAccounting:**
    - a hard-linked inode counts once, in the folder of its first path;
    - its private bytes count only when every link was found, as a credit that Folding places on the smallest node holding every link;
    - full clone groups count once in `scannedUniqueBytes`.
 5. **Folding** classifies every folder and keeps the big or notable ones. The rest fold into one aggregate per Kind under their kept parent.
 6. **Scan.init** validates and assigns kinds. `notReadable` = Data volume used − scanned unique bytes.
+7. **ProposeCandidates** reads that scan through `ScanCatalogQuery` and runs the catalog rules off the cooperative pool. It drops path candidates inside personal folders, keeps one candidate per id, and can filter by kind.
 
 ## Front ends
 
-- **CLI:** `reclaimdisk scan [--path <folder>] [--json]`. Text output or JSON schema 1; exit 0 on success and 1 on any error (its own `main`, because swift-argument-parser would exit 64).
+- **CLI:** `reclaimdisk scan [--path <folder>] [--json]` and `reclaimdisk candidates [--path <folder>] [--kind <kind>] [--json]`. Text output or JSON schema 1; exit 0 on success and 1 on any error (its own `main`, because swift-argument-parser would exit 64). `candidates` lists proposals and deletes nothing.
 - **App:** an Overview tab (disk bar, key, Full Disk Access notice) and a Map tab (nested treemap up to three levels, breadcrumbs, a side list that is also the VoiceOver form). `ScanModel` drives both.
