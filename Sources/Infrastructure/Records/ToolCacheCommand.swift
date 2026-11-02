@@ -19,7 +19,8 @@ enum ToolCacheCommand {
         process.arguments = arguments
         process.environment = environment
         // Never the caller's folder: a project's own settings there (an `.npmrc`, say) would change what a tool reports.
-        process.currentDirectoryURL = URL(fileURLWithPath: "/", isDirectory: true)
+        // The temporary folder is writable and on the Data volume; pnpm writes a probe file into its working folder.
+        process.currentDirectoryURL = FileManager.default.temporaryDirectory
 
         let standardOutput = Pipe()
         let standardError = Pipe()
