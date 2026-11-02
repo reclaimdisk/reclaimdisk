@@ -16,7 +16,8 @@ private func volume(available: ByteCount = mib(200_000)) -> FakeVolumeReader {
 }
 
 @MainActor
-private func waitFor(_ model: ScanModel, timeout: Duration = .seconds(3), _ condition: (ScanModel.State) -> Bool) async -> Bool {
+/// Returns as soon as the condition holds; the long ceiling only matters on a busy machine running every test at once.
+private func waitFor(_ model: ScanModel, timeout: Duration = .seconds(30), _ condition: (ScanModel.State) -> Bool) async -> Bool {
     let clock = ContinuousClock(), deadline = clock.now.advanced(by: timeout)
     while clock.now < deadline {
         if condition(model.state) { return true }

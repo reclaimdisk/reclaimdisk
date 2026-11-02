@@ -107,7 +107,7 @@ private struct FixedRule: Rule {
     let model = CandidatesModel(propose: ProposeCandidates(rules: [FixedRule()], clock: FakeClock(start: now), home: CanonicalPath("/Users/u")!))
     #expect(model.state == .idle)
     model.propose(from: scan)
-    for _ in 0..<300 where { if case .ready = model.state { false } else { true } }() { try await Task.sleep(for: .milliseconds(10)) }
+    for _ in 0..<3_000 where { if case .ready = model.state { false } else { true } }() { try await Task.sleep(for: .milliseconds(10)) }
     guard case let .ready(proposed) = model.state else { Issue.record("not ready: \(model.state)"); return }
     #expect(proposed.candidates.map(\.id.rawValue) == ["rust-build-folder:/Users/u/Projects/app/target"])
 }

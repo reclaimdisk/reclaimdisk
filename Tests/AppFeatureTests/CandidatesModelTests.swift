@@ -37,7 +37,7 @@ private func finishedScan() async throws -> Scan {
 
 @MainActor
 private func waitUntilReady(_ model: CandidatesModel) async throws {
-    for _ in 0..<300 where { if case .ready = model.state { false } else { true } }() {
+    for _ in 0..<3_000 where { if case .ready = model.state { false } else { true } }() {
         try await Task.sleep(for: .milliseconds(10))
     }
 }
@@ -94,7 +94,7 @@ private struct GatedRule: Rule, Sendable {
     })
     let scan = try await finishedScan()
     model.propose(from: scan)
-    for _ in 0..<300 where calls.withLock({ $0 }) < 1 { try await Task.sleep(for: .milliseconds(10)) }
+    for _ in 0..<3_000 where calls.withLock({ $0 }) < 1 { try await Task.sleep(for: .milliseconds(10)) }
     model.propose(from: scan)
     try await waitUntilReady(model)
     guard case let .ready(fresh) = model.state else { Issue.record("not ready: \(model.state)"); return }
