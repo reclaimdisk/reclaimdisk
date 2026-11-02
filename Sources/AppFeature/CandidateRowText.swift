@@ -14,7 +14,7 @@ struct CandidateRowText: Equatable {
 
     init(_ candidate: Candidate) {
         target = Self.target(candidate.target)
-        estimate = Self.estimate(candidate.estimate)
+        estimate = Self.estimate(candidate)
         badge = Self.badge(candidate.reclaimClass)
         detail = Self.detail(candidate)
         blocked = candidate.blockedReason
@@ -32,8 +32,12 @@ struct CandidateRowText: Equatable {
         }
     }
 
-    private static func estimate(_ estimate: Estimate) -> String {
-        switch estimate.basis {
+    /// A report-only candidate frees nothing by itself, so it shows what it takes up.
+    private static func estimate(_ candidate: Candidate) -> String {
+        let estimate = candidate.estimate
+        return switch estimate.basis {
+        case .measured where candidate.reclaimClass == .reportOnly:
+            "Takes up \(ByteFormatting.string(estimate.takesUp ?? .zero, rounding: .nearest))"
         case .measured:
             "Frees at least \(ByteFormatting.string(estimate.freesAtLeast ?? .zero, rounding: .down))"
         case .toolReported(let tool):

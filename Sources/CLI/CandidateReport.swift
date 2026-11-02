@@ -47,13 +47,17 @@ enum CandidateReport {
 
     private static func row(_ candidate: Candidate) -> String {
         let detail = candidate.recovery?.text ?? candidate.explanation ?? ""
-        return [estimateText(candidate.estimate), candidate.reclaimClass.rawValue, candidate.title, targetText(candidate.target), detail]
+        return [estimateText(candidate), candidate.reclaimClass.rawValue, candidate.title, targetText(candidate.target), detail]
             .filter { !$0.isEmpty }
             .joined(separator: "  ")
     }
 
-    private static func estimateText(_ estimate: Estimate) -> String {
-        switch estimate.basis {
+    /// A report-only candidate frees nothing by itself, so it shows what it takes up.
+    private static func estimateText(_ candidate: Candidate) -> String {
+        let estimate = candidate.estimate
+        return switch estimate.basis {
+        case .measured where candidate.reclaimClass == .reportOnly:
+            "takes up \(ByteFormatting.string(estimate.takesUp ?? .zero, rounding: .nearest))"
         case .measured:
             "frees at least \(ByteFormatting.string(estimate.freesAtLeast ?? .zero, rounding: .down))"
         case .toolReported(let tool):
