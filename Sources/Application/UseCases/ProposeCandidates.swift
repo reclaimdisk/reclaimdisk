@@ -16,7 +16,7 @@ public struct CandidateList: Sendable, Equatable {
 }
 
 /// Runs the catalog rules over a finished scan. Path candidates inside personal folders are dropped
-/// even when a rule emits one. Nothing is deleted.
+/// even when a rule emits one. A folder scan keeps only path candidates inside that folder. Nothing is deleted.
 public struct ProposeCandidates: Sendable {
     private let rules: [any Rule]
     private let clock: any WallClock
@@ -38,12 +38,19 @@ public struct ProposeCandidates: Sendable {
         var candidates: [Candidate] = []
         for candidate in results.flatMap(\.candidates) {
             if case .path(let path) = candidate.target, PersonalLocations.contains(path, home: home) { continue }
+            if !scan.isWholeVolume, !Self.isInside(candidate.target, root: scan.root.path) { continue }
             guard seen.insert(candidate.id).inserted else { continue }
             if let kind, candidate.kind != kind { continue }
             candidates.append(candidate)
         }
         candidates.sort(by: Self.comesFirst)
         return CandidateList(candidates: candidates, notes: results.flatMap(\.notes), generatedAt: now)
+    }
+
+    /// A folder run answers for that folder: a path elsewhere, or a tool resource, needs a run over the whole volume.
+    private static func isInside(_ target: Target, root: CanonicalPath) -> Bool {
+        guard case .path(let path) = target else { return false }
+        return path.isSameOrDescendant(of: root)
     }
 
     /// Kind order, then the largest estimate, then the id.
