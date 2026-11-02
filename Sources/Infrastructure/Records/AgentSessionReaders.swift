@@ -204,53 +204,78 @@ private enum CodexMeta {
 }
 
 private enum WorkingDirectories {
+    /// Claude Code writes compact JSON lines with the working directory under a `"cwd"` key, and transcripts reach
+    /// hundreds of megabytes, so the file is searched for that key instead of decoding every line. Only distinct values
+    /// are decoded. A key quoted inside a message is escaped (`\"cwd\"`) and does not match; a key in a nested object
+    /// does, which can only mark more folders as in use.
     static func claude(in file: URL) -> Set<CanonicalPath>? {
-        guard let lines = JSONLines.read(file) else { return nil }
-        var directories: Set<CanonicalPath> = []
-        for line in lines {
-            guard let object = JSONLines.object(line), let cwd = object["cwd"] as? String, let path = CanonicalPath(cwd) else {
-                continue
+        guard let data = try? Data(contentsOf: file, options: [.mappedIfSafe]) else { return nil }
+        let key = Array(#""cwd":""#.utf8)
+        var values: Set<Data> = []
+        data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+            guard let base = buffer.baseAddress else { return }
+            var offset = 0
+            while offset < buffer.count, let found = memmem(base + offset, buffer.count - offset, key, key.count) {
+                let keyStart = base.distance(to: UnsafeRawPointer(found))
+                let valueStart = keyStart + key.count
+                offset = valueStart
+                let before = keyStart > 0 ? buffer[keyStart - 1] : UInt8(ascii: "{")
+                guard before == UInt8(ascii: "{") || before == UInt8(ascii: ",") else { continue }
+                guard let valueEnd = closingQuote(in: buffer, from: valueStart) else { continue }
+                values.insert(Data(buffer[(valueStart - 1)...valueEnd]))
+                offset = valueEnd + 1
             }
+        }
+        var directories: Set<CanonicalPath> = []
+        for value in values {
+            guard let text = try? JSONSerialization.jsonObject(with: value, options: .fragmentsAllowed) as? String,
+                  let path = CanonicalPath(text) else { continue }
             directories.insert(path)
         }
         return directories
     }
 
+    /// The first `session_meta` line names the session; the rest of the rollout is never decoded.
     static func codexMeta(in file: URL) -> CodexMeta {
-        guard let lines = JSONLines.read(file) else { return .failed }
-        for line in lines {
-            guard let object = JSONLines.object(line), object["type"] as? String == "session_meta",
-                  let payload = object["payload"] as? [String: Any], let id = payload["id"] as? String, !id.isEmpty else {
-                continue
+        guard let data = try? Data(contentsOf: file, options: [.mappedIfSafe]) else { return .failed }
+        var meta = CodexMeta.none
+        data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+            guard let base = buffer.baseAddress else { return }
+            var start = 0
+            while start < buffer.count {
+                let end = memchr(base + start, 10, buffer.count - start).map { base.distance(to: UnsafeRawPointer($0)) } ?? buffer.count
+                var line = Data(buffer[start..<end])
+                if line.last == 13 { line.removeLast() }
+                start = end + 1
+                guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+                      object["type"] as? String == "session_meta",
+                      let payload = object["payload"] as? [String: Any], let id = payload["id"] as? String, !id.isEmpty else {
+                    continue
+                }
+                meta = .meta(id: id, cwd: (payload["cwd"] as? String).flatMap(CanonicalPath.init))
+                return
             }
-            let cwd = (payload["cwd"] as? String).flatMap(CanonicalPath.init)
-            return .meta(id: id, cwd: cwd)
         }
-        return .none
+        return meta
     }
-}
 
-private enum JSONLines {
-    static func read(_ url: URL) -> [Data]? {
-        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else { return nil }
-        var lines: [Data] = []
-        var start = data.startIndex
-        for index in data.indices where data[index] == 10 {
-            lines.append(line(data[start..<index]))
-            start = data.index(after: index)
+    /// The index of the quote that ends a JSON string starting at `start`, or nil when the line ends first.
+    private static func closingQuote(in buffer: UnsafeRawBufferPointer, from start: Int) -> Int? {
+        var index = start
+        var escaped = false
+        while index < buffer.count {
+            let byte = buffer[index]
+            if escaped {
+                escaped = false
+            } else if byte == UInt8(ascii: "\\") {
+                escaped = true
+            } else if byte == UInt8(ascii: "\"") {
+                return index
+            } else if byte == 10 {
+                return nil
+            }
+            index += 1
         }
-        if start < data.endIndex { lines.append(line(data[start..<data.endIndex])) }
-        return lines
-    }
-
-    static func object(_ line: Data) -> [String: Any]? {
-        guard !line.isEmpty, let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { return nil }
-        return object
-    }
-
-    private static func line(_ slice: Data.SubSequence) -> Data {
-        var data = Data(slice)
-        if data.last == 13 { data.removeLast() }
-        return data
+        return nil
     }
 }
