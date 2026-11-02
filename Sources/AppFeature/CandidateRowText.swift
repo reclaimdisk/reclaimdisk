@@ -74,9 +74,15 @@ struct CandidateRowText: Equatable {
         if !detail.isEmpty { parts.append(detail) }
         if selected { parts.append("Selected by default") }
         if let blocked, !blocked.isEmpty { parts.append(blocked) }
-        let facts = evidence.map(\.fact)
-        if !facts.isEmpty { parts.append(facts.joined(separator: ". ")) }
-        return parts.map(DisplayText.escaped).joined(separator: ". ")
+        parts.append(contentsOf: evidence.map(\.fact))
+        return parts.map { sentence($0) }.joined(separator: ". ")
+    }
+
+    /// One sentence of the label, without its own closing period: the join adds one.
+    private static func sentence(_ text: String) -> String {
+        var escaped = DisplayText.escaped(text)
+        while escaped.hasSuffix(".") { escaped.removeLast() }
+        return escaped
     }
 
     private static func capitalized(_ tool: String) -> String {
