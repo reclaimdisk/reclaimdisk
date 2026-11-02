@@ -56,3 +56,37 @@ private func write(_ text: String, to url: URL, modified: Date) throws {
     #expect(takesUp.bytes >= 40_000)
     #expect(freesAtLeast == .zero)
 }
+
+/// SwiftPM's `.build` is build output like Cargo's `target`, so it never blocks a worktree as "ignored files".
+@Test func swiftPackageBuildOutputIsNotAnIgnoredNote() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    func git(_ arguments: [String], in directory: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", directory.path] + arguments
+        process.environment = ["GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid", "GIT_COMMITTER_NAME": "t",
+                               "GIT_COMMITTER_EMAIL": "t@example.invalid", "HOME": root.path, "PATH": "/usr/bin:/bin"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0, "git \(arguments.joined(separator: " "))")
+    }
+    let repo = root.appendingPathComponent("pkg")
+    try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+    try git(["init", "-q", "-b", "main"], in: repo)
+    try write(".build/\n", to: repo.appendingPathComponent(".gitignore"), modified: Date())
+    try write("// swift-tools-version: 6.0\n", to: repo.appendingPathComponent("Package.swift"), modified: Date())
+    try git(["add", "."], in: repo)
+    try git(["commit", "-q", "-m", "init"], in: repo)
+    let worktree = repo.appendingPathComponent(".worktrees/feat")
+    try git(["worktree", "add", "-q", "-b", "feat", worktree.path], in: repo)
+    try write("obj\n", to: worktree.appendingPathComponent(".build/debug/pkg.o"), modified: Date())
+    guard case .worktree(let state) = LiveGitRecords().worktree(at: CanonicalPath(worktree.path)!) else {
+        Issue.record("expected a worktree reading")
+        return
+    }
+    #expect(state.ignoredNonBuildPaths.isEmpty)
+    #expect(!state.hasChanges)
+}
