@@ -39,7 +39,8 @@ struct LiveGitRecords: GitRecords {
             return .unreadable("Can't read the worktree from Git.")
         }
         let changes = StatusSummary.parse(status.output, buildOutputNames: Self.buildOutputNames)
-        let branch = lines[0].isEmpty ? nil : lines[0]
+        // A detached HEAD prints "HEAD": that is no branch.
+        let branch = lines[0].isEmpty || lines[0] == "HEAD" ? nil : lines[0]
         let submodules = FileManager.default.fileExists(atPath: path.raw + "/.gitmodules")
         let locked = FileManager.default.fileExists(atPath: gitDir.raw + "/locked")
         return .worktree(WorktreeState(
@@ -110,7 +111,7 @@ struct LiveGitRecords: GitRecords {
     }
 }
 
-private struct StatusSummary {
+struct StatusSummary {
     var hasChanges = false
     var ignoredNonBuildPaths: [String] = []
 
@@ -126,8 +127,9 @@ private struct StatusSummary {
                 let path = GitPath.unescape(String(line.dropFirst(3)))
                 let trimmed = trimTrailingSlash(path)
                 guard !trimmed.isEmpty else { continue }
-                let first = trimmed.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: true).first.map(String.init) ?? trimmed
-                if !buildOutputNames.contains(first) { summary.ignoredNonBuildPaths.append(trimmed) }
+                // Git names the ignored folder itself, however deep it sits in a monorepo; its own name decides.
+                let name = trimmed.split(separator: "/", omittingEmptySubsequences: true).last.map(String.init) ?? trimmed
+                if !buildOutputNames.contains(name) { summary.ignoredNonBuildPaths.append(trimmed) }
             } else {
                 summary.hasChanges = true
             }

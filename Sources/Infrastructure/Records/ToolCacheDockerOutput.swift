@@ -145,6 +145,9 @@ private func scaled(_ number: String, by scale: UInt64) -> UInt64? {
 /// `docker image ls` prints a short id; the container may carry the full digest.
 private func containerUses(imageID: String, reference: String, containerImage: String) -> Bool {
     if containerImage == reference || containerImage == imageID { return true }
+    // `docker run postgres` records "postgres"; Docker means the latest tag.
+    if containerImage + ":latest" == reference, !containerImage.contains("@"),
+       !(containerImage.split(separator: "/").last ?? "").contains(":") { return true }
     let pieces = containerImage.split(separator: "@", maxSplits: 1)
     if pieces.count == 2, String(pieces[0]) == reference { return true }
     let loweredID = imageID.lowercased()

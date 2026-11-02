@@ -10,7 +10,7 @@ struct LivePackageCacheRecords: PackageCacheRecords {
 
     func read() -> [PackageCacheReading] {
         let directories = binaryDirectories(home: home)
-        let environment = ["HOME": home.raw, "PATH": directories.joined(separator: ":")]
+        let environment = PackageCacheLayout.queryEnvironment(home: home, path: directories.joined(separator: ":"))
         return CacheQuery.all.map { query in reading(query, directories: directories, environment: environment) }
     }
 
@@ -28,7 +28,8 @@ struct LivePackageCacheRecords: PackageCacheRecords {
             let reason = blank ? "\(query.display) printed nothing" : "\(query.display) did not print a path"
             return .unparseable(tool: query.tool, reason: reason)
         }
-        guard let folder = resolve(pathText, home: home) else {
+        guard let reported = resolve(pathText, home: home),
+              let folder = PackageCacheLayout.cleanedFolder(tool: query.tool, reported: reported) else {
             return .unparseable(tool: query.tool, reason: "\(query.display) path could not be resolved")
         }
         guard let clean = ToolCommand(executable: query.executable, arguments: query.cleanArguments) else {
@@ -36,6 +37,23 @@ struct LivePackageCacheRecords: PackageCacheRecords {
         }
         let busy = query.watchesLock ? uvBusyReason(environment: environment) : nil
         return .found(PackageCache(tool: query.tool, folder: folder, clean: clean, clearsWholeFolder: query.clearsWholeFolder, busyReason: busy))
+    }
+}
+
+/// Where each package manager's clean command works, and the environment its queries run in.
+enum PackageCacheLayout {
+    /// `npm cache clean --force` empties `<cache>/_cacache` and leaves `_npx` and `_logs`; the others clean the folder they
+    /// report.
+    static func cleanedFolder(tool: String, reported: CanonicalPath) -> CanonicalPath? {
+        tool == "npm" ? reported.appending("_cacache") : reported
+    }
+
+    /// HOME and PATH, with every update check off: a query must not write a file or reach the network.
+    static func queryEnvironment(home: CanonicalPath, path: String) -> [String: String] {
+        [
+            "HOME": home.raw, "PATH": path, "npm_config_update_notifier": "false", "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+            "HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ANALYTICS": "1",
+        ]
     }
 }
 
