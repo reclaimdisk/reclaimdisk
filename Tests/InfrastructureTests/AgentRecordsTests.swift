@@ -66,7 +66,8 @@ private func canonical(_ url: URL) -> CanonicalPath { CanonicalPath(url.resolvin
     try write(String(repeating: "b", count: 40_000), to: incremental.appendingPathComponent("cgu2.o"), modified: old)
     try FileManager.default.linkItem(at: incremental.appendingPathComponent("cgu2.o"), to: deps.appendingPathComponent("app-0d03.cgu2.rcgu.o"))
     try write(String(repeating: "c", count: 40_000), to: deps.appendingPathComponent("app-0d03.rlib"), modified: old)       // not an object file
-    try write(String(repeating: "d", count: 40_000), to: deps.appendingPathComponent("app-ffff.cgu1.rcgu.o"))                // touched just now
+    let recent = Date(timeIntervalSince1970: 1_799_999_000)  // 1 000 s before "now": still in use
+    try write(String(repeating: "d", count: 40_000), to: deps.appendingPathComponent("app-ffff.cgu1.rcgu.o"), modified: recent)
     try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: incremental.path)
     try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: incremental.deletingLastPathComponent().path)
     let reading = LiveStaleBuildRecords().stale(in: canonical(target), untouchedForSeconds: 3_600,
