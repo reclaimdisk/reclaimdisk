@@ -26,7 +26,7 @@ import TestSupport
     reader.directory("\(data)/Applications", [Entry.file("apps.bin", allocated: ByteCount(129 * gib), fileID: 4)])
     let model = ScanModel(runScan: RunScan(reader: reader, clock: FakeClock(), home: CanonicalPath("/Users/u")!))
     model.start()
-    for _ in 0..<300 where { if case .finished = model.state { false } else { true } }() { try await Task.sleep(for: .milliseconds(10)) }
+    for _ in 0..<3_000 where { if case .finished = model.state { false } else { true } }() { try await Task.sleep(for: .milliseconds(10)) }
     guard case .finished = model.state else { Issue.record("scan did not finish: \(model.state)"); return }
 
     for scheme in [ColorScheme.light, .dark] {

@@ -27,6 +27,7 @@ struct DirectoryTable {
     var newestOwn: [Int64] = [Int64.min]
     /// Folders that failed to read or vanished: they contribute nothing and get no node.
     var excluded: [Bool] = [false]
+    /// Force-kept marker names and recorded project-file names seen directly in the folder.
     var markers: [Int32: Set<String>] = [:]
     var largeFiles: [Int32: [LargeFile]] = [:]
     var unreadable: [(folder: Int32, reason: UnreadableReason)] = []

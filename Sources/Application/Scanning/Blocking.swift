@@ -1,6 +1,6 @@
 import Dispatch
 
-/// Runs one blocking call off Swift's cooperative thread pool (Global Constraints; see ReadPool).
+/// Runs one blocking call off Swift's cooperative thread pool (see ReadPool).
 enum Blocking {
     private static let queue = DispatchQueue(label: "reclaimdisk.blocking", qos: .userInitiated, attributes: .concurrent)
 

@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 # Scratch space outside the repository, removed however the script ends.
 tmp=$(mktemp -d)
 fixture_build=$(mktemp -d)
-trap 'rm -rf "$tmp" "$tmp.json" "$tmp.err" "$fixture_build"' EXIT
+trap 'rm -rf "$tmp" "$tmp.json" "$tmp.err" "$tmp.cand.json" "$fixture_build"' EXIT
 
 swift --version
 swift scripts/check-architecture.swift self-test
@@ -42,4 +42,12 @@ rc=0; "$bin" scan --path /etc/hosts 2> "$tmp.err" || rc=$?
 rc=0; "$bin" scan --no-such-flag 2> /dev/null || rc=$?
 [ "$rc" -eq 1 ] || { echo "usage errors must exit 1, got $rc" >&2; exit 1; }
 "$bin" --version | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "--version must print the version" >&2; exit 1; }
+
+# Candidates end-to-end: a Rust build folder in a fixture project is listed with its evidence.
+mkdir -p "$tmp/cand/proj/target"
+touch "$tmp/cand/proj/Cargo.toml" "$tmp/cand/proj/target/CACHEDIR.TAG" "$tmp/cand/proj/target/.rustc_info.json"
+head -c 1048576 /dev/urandom > "$tmp/cand/proj/target/blob"
+"$bin" candidates --path "$tmp/cand" --json > "$tmp.cand.json"
+grep -q '"schemaVersion" *: *1' "$tmp.cand.json" || { cat "$tmp.cand.json" >&2; echo "candidates JSON lacks schema 1" >&2; exit 1; }
+grep -q "\"rust-build-folder:$(cd "$tmp/cand/proj/target" && pwd -P)\"" "$tmp.cand.json" || { cat "$tmp.cand.json" >&2; echo "the fixture Rust build folder is missing" >&2; exit 1; }
 echo "end-to-end: ok"

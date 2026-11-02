@@ -8,9 +8,9 @@
 
   Copies that share blocks (APFS clones) and hard links aren't counted twice.
 - **Nothing in use gets touched.** That matters once cleaning arrives: anything that can't be verified counts as in use.
-- **It knows developer tools.** Build folders are recognized by their markers (for example Cargo's `CACHEDIR.TAG` + `.rustc_info.json`, whatever the folder is called), and each folder is sorted into a kind.
+- **It knows developer tools.** Build folders are recognized by their markers (for example Cargo's `CACHEDIR.TAG` + `.rustc_info.json`, whatever the folder is called), and each folder is sorted into a kind. Candidates also come from the tools themselves: Docker, package managers, Xcode and simulators, Android, Playwright, and the worktrees and temp folders AI agents leave behind.
 
-> **Status: work in progress.** This version only scans and maps, and it never deletes anything. Finding cleanup candidates and cleaning them come in later versions.
+> **Status: work in progress.** This version scans, maps, and lists cleanup candidates, in the terminal and in the app's Cleanup tab. It never deletes anything.
 
 ## Build and run
 
@@ -21,13 +21,18 @@ swift build -c release
 .build/release/reclaimdisk scan                  # whole Data volume
 .build/release/reclaimdisk scan --path ~/Projects
 .build/release/reclaimdisk scan --path . --json  # JSON schema 1
-swift run ReclaimDiskApp                         # the app: Overview and Map
+.build/release/reclaimdisk candidates --path ~/Projects
+.build/release/reclaimdisk candidates --path . --json
+.build/release/reclaimdisk candidates --kind docker  # one kind, whole Data volume
+swift run ReclaimDiskApp                         # the app: Overview, Map and Cleanup
 scripts/ci.sh                                    # all checks
 ```
 
 ## Honest limits
 
-- **Read-only** in this version.
+- **Read-only** in this version. `candidates` only lists what a later cleanup could remove, and a folder changed in the last 24 hours stays visible but is not preselected.
+- **Tools are only asked, never told.** ReclaimDisk runs read-only commands such as `docker system df`, `git status` and `simctl list`, each with a timeout. When a tool doesn't answer, its candidates are blocked or listed under "Couldn't check".
+- **Tool-reported sizes are the tool's own numbers.** Docker and simctl report sizes that ReclaimDisk can't verify, so those candidates promise no "frees at least".
 - **"Frees at least" is a lower bound.** Blocks shared only between files you'd delete together aren't credited yet.
 - **Locked folders.** Some folders (Mail, Messages, Safari) need Full Disk Access to be counted: System Settings › Privacy & Security › Full Disk Access.
 - **"Not counted" space.** System-only folders, file-system metadata and snapshots stay uncounted, and the app shows them as "Not counted".

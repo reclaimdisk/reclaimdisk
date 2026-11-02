@@ -7,10 +7,10 @@
     "Cleanup": ["SharedKernel"],
     "Ledger": ["SharedKernel"],
     "Application": ["SharedKernel", "Inventory", "Catalog", "Cleanup", "Ledger"],
-    "Infrastructure": ["SharedKernel", "Inventory", "Application"],
-    "CLI": ["SharedKernel", "Inventory", "Application", "Infrastructure", "product:ArgumentParser"],
-    "AppFeature": ["SharedKernel", "Inventory", "Application", "Infrastructure"],
+    "Infrastructure": ["SharedKernel", "Inventory", "Catalog", "Application"],
+    "CLI": ["SharedKernel", "Inventory", "Catalog", "Application", "Infrastructure", "product:ArgumentParser"],
+    "AppFeature": ["SharedKernel", "Inventory", "Catalog", "Application", "Infrastructure"],
     "ReclaimDiskApp": ["AppFeature"],
-    "TestSupport": ["SharedKernel", "Inventory", "Application"]
+    "TestSupport": ["SharedKernel", "Inventory", "Catalog", "Application"]
   }
 }

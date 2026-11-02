@@ -65,7 +65,8 @@ public struct ScanBuilder: Sendable {
                             bytesSeen += entry.allocated.bytes
                             // "Frees at least" can never exceed what the file occupies; clamp so one odd value can't fail the scan.
                             let privateBytes = min(entry.privateSize.bytes, entry.allocated.bytes)
-                            if entry.type == .file, options.markerFileNames.contains(entry.name) {
+                            if entry.type == .file,
+                               options.markerFileNames.contains(entry.name) || options.recordedMarkerFileNames.contains(entry.name) {
                                 table.markers[folder, default: []].insert(entry.name)
                             }
                             if entry.type == .file, entry.cloneRefCount > 1 {

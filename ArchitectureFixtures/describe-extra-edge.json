@@ -6,6 +6,7 @@
       "target_dependencies": [
         "SharedKernel",
         "Inventory",
+        "Catalog",
         "Application"
       ],
       "type": "library"
@@ -75,6 +76,7 @@
       "target_dependencies": [
         "SharedKernel",
         "Inventory",
+        "Catalog",
         "Application"
       ],
       "type": "library"
@@ -117,6 +119,7 @@
       "target_dependencies": [
         "SharedKernel",
         "Inventory",
+        "Catalog",
         "Application",
         "Infrastructure"
       ],
@@ -163,6 +166,7 @@
       "target_dependencies": [
         "SharedKernel",
         "Inventory",
+        "Catalog",
         "Application",
         "Infrastructure"
       ],
