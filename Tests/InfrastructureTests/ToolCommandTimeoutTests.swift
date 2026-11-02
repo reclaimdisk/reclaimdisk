@@ -1,3 +1,4 @@
+import Foundation
 @testable import Infrastructure
 import Testing
 
@@ -20,8 +21,11 @@ import Testing
 }
 
 /// A query never inherits the caller's folder, so a project's own tool settings (an `.npmrc` beside the shell) can't
-/// redirect what a tool reports.
-@Test func aCommandRunsFromTheRootFolder() {
-    let output = ToolCacheCommand.run(executable: "/bin/pwd", arguments: [], environment: [:], timeout: .seconds(10))
-    #expect(output?.standardOutput == "/\n")
+/// redirect what a tool reports. It runs from the user's temporary folder: writable, on the Data volume, and some tools
+/// (pnpm) write a probe file into their working folder.
+@Test func aCommandRunsFromTheTemporaryFolder() {
+    let output = ToolCacheCommand.run(executable: "/bin/pwd", arguments: ["-P"], environment: [:], timeout: .seconds(10))
+    let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
+    let printed = output?.standardOutput.trimmingCharacters(in: .newlines) ?? ""
+    #expect(URL(fileURLWithPath: printed).resolvingSymlinksInPath().path == temporary)
 }
