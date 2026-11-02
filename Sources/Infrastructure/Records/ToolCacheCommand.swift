@@ -18,6 +18,8 @@ enum ToolCacheCommand {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.environment = environment
+        // Never the caller's folder: a project's own settings there (an `.npmrc`, say) would change what a tool reports.
+        process.currentDirectoryURL = URL(fileURLWithPath: "/", isDirectory: true)
 
         let standardOutput = Pipe()
         let standardError = Pipe()

@@ -211,8 +211,10 @@ private struct PackageCacheRule: Rule {
         return RuleResult(candidates: candidates, notes: notes)
     }
 
-    /// A folder the scan did not keep is below the listing threshold, so it is not a candidate.
+    /// A folder the scan did not keep is below the listing threshold, so it is not a candidate. A tool can be configured to
+    /// keep its cache anywhere; one inside a personal folder is never offered.
     private func candidate(for cache: PackageCache, context: RuleContext) -> Candidate? {
+        guard !PersonalLocations.contains(cache.folder, home: context.home) else { return nil }
         guard let folder = context.scan.folders().first(where: { sameFolder($0.path, cache.folder) }) else { return nil }
         // A partial cleaner does not empty the folder, so it cannot promise a minimum.
         let freesAtLeast = cache.clearsWholeFolder ? folder.freesAtLeast : .zero
