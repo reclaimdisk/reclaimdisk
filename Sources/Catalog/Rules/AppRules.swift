@@ -49,7 +49,8 @@ private struct PlaywrightBrowserBuildsRule: Rule {
         return try? Candidate(
             rule: id, title: title, kind: .caches, target: .path(build.folder), reclaimClass: .rebuildable,
             estimate: estimate, evidence: [evidence], recovery: recovery, action: .deletePath(build.folder),
-            newestChange: scanned?.newestChange, isInstalledRuntime: true, blockedReason: nil, explanation: nil
+            newestChange: scanned?.newestChange, isInstalledRuntime: true,
+            blockedReason: RecentActivity.reason(newestChange: scanned?.newestChange, now: context.now), explanation: nil
         )
     }
 
@@ -94,7 +95,9 @@ private struct AppCachesRule: Rule {
                   fact: "Belongs to \(app.name) (\(app.bundleID))", source: .fileSystem, observedAt: context.now
               ),
               let recovery = Recovery("\(app.name) fills it again as needed") else { return nil }
-        let blocked = running.contains(app.bundleID.lowercased()) ? "\(app.name) is running. Quit it first." : nil
+        let blocked = running.contains(app.bundleID.lowercased())
+            ? "\(app.name) is running. Quit it first."
+            : RecentActivity.reason(newestChange: folder.newestChange, now: context.now)
         return try? Candidate(
             rule: id, title: title, kind: .caches, target: .path(folder.path), reclaimClass: .rebuildable,
             estimate: estimate, evidence: [evidence], recovery: recovery, action: .deletePath(folder.path),

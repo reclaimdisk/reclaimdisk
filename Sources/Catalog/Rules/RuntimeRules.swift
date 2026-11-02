@@ -310,7 +310,8 @@ private func pathCandidate(
     return try? Candidate(
         rule: rule, title: title, kind: .developerTools, target: .path(folder.path), reclaimClass: .rebuildable,
         estimate: estimate, evidence: [evidence], recovery: Recovery(recovery), action: .deletePath(folder.path),
-        newestChange: folder.newestChange, isInstalledRuntime: false, blockedReason: nil, explanation: nil
+        newestChange: folder.newestChange, isInstalledRuntime: false,
+        blockedReason: RecentActivity.reason(newestChange: folder.newestChange, now: context.now), explanation: nil
     )
 }
 

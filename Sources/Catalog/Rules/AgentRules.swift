@@ -210,11 +210,12 @@ private struct AgentWorktreesRule: Rule {
         )
     }
 
+    /// With no branch there is nothing to add the worktree back from, so the recovery says to make one first.
     private func recoveryText(path: CanonicalPath, branch: String?) -> String {
         if let branch, !branch.isEmpty {
             return "git worktree add \(path.raw) \(branch): the branch and its commits stay"
         }
-        return "git worktree add \(path.raw): the branch and its commits stay"
+        return "Give its commits a branch first: git -C \(path.raw) switch -c <name>"
     }
 
     private func sessionsFact(_ sessions: SessionReading) -> String {
@@ -248,6 +249,7 @@ private struct AgentWorktreesRule: Rule {
             }
             if state.hasSubmodules { return "It has submodules." }
             if state.isLocked { return "It is locked." }
+            if state.branch == nil { return "It has no branch, so removing it would leave its commits on no branch." }
         }
         if case .unreadable = reading { return "Can't read this worktree from Git." }
         if case .unreadable = sessions { return "Can't tell whether an agent session is using it." }
@@ -275,7 +277,8 @@ private struct GradleBuildOutputRule: Rule {
             return AgentCandidate.make(
                 rule: id, title: title, kind: .buildOutput, folder: folder, context: context, reclaimClass: .rebuildable,
                 estimate: AgentCandidate.measured(folder), evidence: evidence, recovery: "gradle build",
-                action: .deletePath(folder.path), blockedReason: nil, explanation: nil
+                action: .deletePath(folder.path),
+                blockedReason: RecentActivity.reason(newestChange: folder.newestChange, now: context.now), explanation: nil
             )
         }
         return RuleResult(candidates: candidates, notes: [])

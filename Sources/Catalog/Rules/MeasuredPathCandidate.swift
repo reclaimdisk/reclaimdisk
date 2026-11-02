@@ -4,6 +4,7 @@ import SharedKernel
 enum MeasuredPathCandidate {
     static func isProtected(_ folder: ScannedFolder, home: CanonicalPath) -> Bool {
         PersonalLocations.contains(folder.path, home: home) || AgentLocations.isAgentTemp(folder.path)
+            || InstalledSoftwareLocations.contains(folder.path, home: home)
     }
 
     static func make(
