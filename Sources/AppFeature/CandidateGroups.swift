@@ -31,6 +31,12 @@ enum CandidateGroups {
         list.candidates.reduce(0) { count, candidate in count + (candidate.isPreselected ? 1 : 0) }
     }
 
+    /// A group's header total. With nothing selected by default it says so, rather than "Frees at least 0 MiB" beside a
+    /// tool's own reported size.
+    static func totalText(_ frees: ByteCount) -> String {
+        frees > .zero ? "Frees at least \(ByteText.down(frees))" : "Nothing selected by default"
+    }
+
     /// Only a preselected candidate contributes, and only its measured lower bound.
     private static func freesAtLeast(_ candidates: [Candidate]) -> ByteCount {
         candidates.reduce(.zero) { sum, candidate in

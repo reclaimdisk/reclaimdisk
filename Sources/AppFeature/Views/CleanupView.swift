@@ -192,7 +192,7 @@ private struct GroupLine: View {
                 .foregroundStyle(CleanupPalette.title(scheme))
                 .lineLimit(1)
             Spacer(minLength: 8)
-            Text("Frees at least \(ByteText.down(frees))")
+            Text(CandidateGroups.totalText(frees))
                 .font(.subheadline)
                 .foregroundStyle(CleanupPalette.secondary(scheme))
                 .monospacedDigit()
