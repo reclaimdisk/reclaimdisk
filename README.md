@@ -23,7 +23,7 @@ swift build -c release
 .build/release/reclaimdisk scan --path . --json  # JSON schema 1
 .build/release/reclaimdisk candidates --path ~/Projects
 .build/release/reclaimdisk candidates --path . --json
-.build/release/reclaimdisk candidates --kind docker  # one kind only
+.build/release/reclaimdisk candidates --kind docker  # one kind, whole Data volume
 swift run ReclaimDiskApp                         # the app: Overview, Map and Cleanup
 scripts/ci.sh                                    # all checks
 ```

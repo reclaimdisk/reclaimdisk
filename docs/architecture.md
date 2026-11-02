@@ -55,7 +55,7 @@ ReclaimDisk is one Swift package. The domain follows domain-driven design where 
    - full clone groups count once in `scannedUniqueBytes`.
 5. **Folding** classifies every folder and keeps the big or notable ones. The rest fold into one aggregate per Kind under their kept parent.
 6. **Scan.init** validates and assigns kinds. `notReadable` = Data volume used − scanned unique bytes.
-7. **ProposeCandidates** reads that scan through `ScanCatalogQuery` and runs the catalog rules off the cooperative pool. It drops path candidates inside personal folders, keeps one candidate per id, and can filter by kind.
+7. **ProposeCandidates** reads that scan through `ScanCatalogQuery` and runs the catalog rules off the cooperative pool. It drops path candidates inside personal folders, keeps one candidate per id, and can filter by kind. A folder scan keeps only path candidates inside that folder; tool resources such as Docker's build cache appear in a run over the whole Data volume.
 
 ## Candidates
 
