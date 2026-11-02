@@ -104,8 +104,9 @@ struct LiveGitRecords: GitRecords {
         return resolved(path)
     }
 
+    /// `core.fsmonitor` names a program `git status` would start; a read must never run one.
     private func run(_ arguments: [String]) -> GitOutput? {
-        GitProcess.run(executable: Self.git, arguments: arguments, timeoutSeconds: Self.timeoutSeconds)
+        GitProcess.run(executable: Self.git, arguments: ["-c", "core.fsmonitor=false"] + arguments, timeoutSeconds: Self.timeoutSeconds)
     }
 }
 
