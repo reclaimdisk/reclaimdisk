@@ -26,14 +26,14 @@ enum CandidateReport {
             lines.append(KindTitles.title(for: kind))
             for candidate in group {
                 lines.append("  " + row(candidate))
-                if let blocked = candidate.blockedReason { lines.append("  " + blocked) }
+                if let blocked = candidate.blockedReason { lines.append("  " + DisplayText.escaped(blocked)) }
             }
         }
         if !list.notes.isEmpty {
             if !lines.isEmpty { lines.append("") }
             lines.append("Notes")
             for note in list.notes {
-                lines.append("  \(note.rule.rawValue) (\(note.status.rawValue)): \(note.reason)")
+                lines.append("  \(note.rule.rawValue) (\(note.status.rawValue)): \(DisplayText.escaped(note.reason))")
             }
         }
         let total = list.candidates.reduce(ByteCount.zero) { sum, candidate in
@@ -46,8 +46,8 @@ enum CandidateReport {
     }
 
     private static func row(_ candidate: Candidate) -> String {
-        let detail = candidate.recovery?.text ?? candidate.explanation ?? ""
-        return [estimateText(candidate), candidate.reclaimClass.rawValue, candidate.title, targetText(candidate.target), detail]
+        let detail = DisplayText.escaped(candidate.recovery?.text ?? candidate.explanation ?? "")
+        return [estimateText(candidate), candidate.reclaimClass.rawValue, DisplayText.escaped(candidate.title), targetText(candidate.target), detail]
             .filter { !$0.isEmpty }
             .joined(separator: "  ")
     }
