@@ -10,7 +10,7 @@ struct LiveGitRecords: GitRecords {
     private static let timeoutSeconds = 10
     private static let buildOutputNames: Set<String> = [
         "target", "build", "dist", "out", "node_modules", ".next", ".turbo", ".parcel-cache", ".svelte-kit", ".nuxt",
-        ".venv", "venv", ".gradle", "DerivedData", "__pycache__",
+        ".venv", "venv", ".gradle", "DerivedData", "__pycache__", ".build",
     ]
 
     func worktree(at path: CanonicalPath) -> WorktreeReading {
