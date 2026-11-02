@@ -1,6 +1,6 @@
 import SharedKernel
 
-/// One formatter for every front end (Global Constraints, "Sizes"). "Frees at least" figures use `.down`
+/// One formatter for every front end. "Frees at least" figures use `.down`
 /// so the lower bound is never overstated; everything else uses `.nearest`.
 public enum ByteFormatting {
     public enum Rounding: Sendable { case nearest, down }
