@@ -67,3 +67,41 @@ private func waitUntilReady(_ model: CandidatesModel) async throws {
     #expect(calls.withLock { $0 } == 2)
     #expect(second.notes.map(\.reason) == ["2"])
 }
+
+/// Holds its proposal until the test lets it go, so it finishes after a newer one.
+private struct GatedRule: Rule, Sendable {
+    let id = RuleID("gated-rule")!
+    let title = "Gated rule"
+    let gate: DispatchSemaphore
+
+    func evaluate(_: RuleContext) -> RuleResult {
+        _ = gate.wait(timeout: .now() + 5)
+        return RuleResult(candidates: [], notes: [RuleNote(rule: id, status: .unknown, reason: "stale")])
+    }
+}
+
+@Test @MainActor func aProposalThatLostTheRaceNeverWritesItsList() async throws {
+    let gate = DispatchSemaphore(value: 0)
+    let calls = OSAllocatedUnfairLock(initialState: 0)
+    let home = CanonicalPath("/Users/u")!
+    let model = CandidatesModel(makePropose: {
+        let call = calls.withLock { state -> Int in
+            state += 1
+            return state
+        }
+        let rule: any Rule = call == 1 ? GatedRule(gate: gate) : MarkedRule(mark: "fresh")
+        return ProposeCandidates(rules: [rule], clock: FakeClock(), home: home)
+    })
+    let scan = try await finishedScan()
+    model.propose(from: scan)
+    for _ in 0..<300 where calls.withLock({ $0 }) < 1 { try await Task.sleep(for: .milliseconds(10)) }
+    model.propose(from: scan)
+    try await waitUntilReady(model)
+    guard case let .ready(fresh) = model.state else { Issue.record("not ready: \(model.state)"); return }
+    #expect(fresh.notes.map(\.reason) == ["fresh"])
+
+    gate.signal()
+    try await Task.sleep(for: .milliseconds(300))
+    guard case let .ready(after) = model.state else { Issue.record("not ready: \(model.state)"); return }
+    #expect(after.notes.map(\.reason) == ["fresh"])
+}
