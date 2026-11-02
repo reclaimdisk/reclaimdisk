@@ -8,22 +8,38 @@ public struct ScanOptions: Sendable {
     public var classifier: KindClassifier
     /// Folders and files smaller than this are folded into per-kind aggregates.
     public var minimumNodeSize: ByteCount
-    /// Names of files whose presence is recorded on their folder (`NodeDraft.markers`).
+    /// Names of files whose presence keeps the folder and is recorded on it (`NodeDraft.markers`).
     public var markerFileNames: Set<String>
-    /// Folders with these names are always kept, whatever their size.
+    /// Recorded on the folder, and never a reason to keep it. Project files such as package.json and lockfiles.
+    public var recordedMarkerFileNames: Set<String>
+    /// Kept when the folder's total is at least `retainedMinimumSize` and no ancestor below the scan root
+    /// has one of these names or a force-kept marker.
     public var retainedDirectoryNames: Set<String>
+    /// A retained-name folder smaller than this is folded like any other small folder.
+    public var retainedMinimumSize: ByteCount
     public var maxConcurrentReads: Int
 
     public init(
         root: CanonicalPath, classifier: KindClassifier, minimumNodeSize: ByteCount = ByteCount(268_435_456),
-        markerFileNames: Set<String> = ["CACHEDIR.TAG", ".rustc_info.json"], retainedDirectoryNames: Set<String> = [],
+        markerFileNames: Set<String> = ["CACHEDIR.TAG", ".rustc_info.json"],
+        recordedMarkerFileNames: Set<String> = [
+            "package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb",
+            "pyvenv.cfg", "uv.lock", "poetry.lock", "requirements.txt", "requirements-dev.txt", "Cargo.toml",
+            "build.gradle", "build.gradle.kts",
+        ],
+        retainedDirectoryNames: Set<String> = [
+            "node_modules", ".next", ".turbo", ".parcel-cache", ".svelte-kit", ".nuxt", ".venv", "venv",
+        ],
+        retainedMinimumSize: ByteCount = .mebibyte,
         maxConcurrentReads: Int = ProcessInfo.processInfo.activeProcessorCount
     ) {
         self.root = root
         self.classifier = classifier
         self.minimumNodeSize = minimumNodeSize
         self.markerFileNames = markerFileNames
+        self.recordedMarkerFileNames = recordedMarkerFileNames
         self.retainedDirectoryNames = retainedDirectoryNames
+        self.retainedMinimumSize = retainedMinimumSize
         self.maxConcurrentReads = maxConcurrentReads
     }
 }

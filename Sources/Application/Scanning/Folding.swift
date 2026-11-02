@@ -42,12 +42,16 @@ enum Folding {
                 takes[parent] += takes[index]
                 newest[parent] = max(newest[parent], newest[index])
             }
+            let retainedBlocked = Self.retainedNameBlocked(count: count, table: table, options: options)
             var keep = Array(repeating: false, count: count)
             for index in 0..<count where !table.excluded[index] {
+                let retained = options.retainedDirectoryNames.contains(table.name[index])
+                    && takes[index] >= options.retainedMinimumSize.bytes
+                    && !retainedBlocked[index]
                 keep[index] = index == 0
                     || takes[index] >= options.minimumNodeSize.bytes   // the folder's TOTAL, not just its own files
-                    || options.retainedDirectoryNames.contains(table.name[index])
-                    || table.markers[Int32(index)] != nil
+                    || retained
+                    || Self.hasForceKeptMarker(index, table: table, names: options.markerFileNames)
                     || table.largeFiles[Int32(index)] != nil
             }
             for index in stride(from: count - 1, to: 0, by: -1) where !table.excluded[index] && keep[index] {
@@ -77,6 +81,27 @@ enum Folding {
             self.keptCredit = keptCredit
             self.foldedCredits = foldedCredits
             self.linkFolders = linkFolders
+        }
+
+        /// True when an ancestor below the scan root has a retained name or a force-kept marker.
+        /// The root itself is not below the scan root, so its name does not suppress a child.
+        private static func retainedNameBlocked(count: Int, table: DirectoryTable, options: ScanOptions) -> [Bool] {
+            var blocked = Array(repeating: false, count: count)
+            for index in 1..<count {
+                let parent = Int(table.parent[index])
+                let parentBlocks = parent > 0 && (
+                    options.retainedDirectoryNames.contains(table.name[parent])
+                        || hasForceKeptMarker(parent, table: table, names: options.markerFileNames)
+                )
+                blocked[index] = blocked[parent] || parentBlocks
+            }
+            return blocked
+        }
+
+        /// Recorded markers share `DirectoryTable.markers` but only the force-kept names keep a folder.
+        private static func hasForceKeptMarker(_ index: Int, table: DirectoryTable, names: Set<String>) -> Bool {
+            guard let markers = table.markers[Int32(index)] else { return false }
+            return !markers.isDisjoint(with: names)
         }
 
         /// Int64.min is the table's "nothing dated here" value (APFS also clamps dates before 1677 to it).

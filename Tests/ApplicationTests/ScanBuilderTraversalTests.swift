@@ -14,10 +14,12 @@ private func build(_ reader: FakeVolumeReader, _ options: ScanOptions) async thr
 @Test func ownBytesAndNestedTotals() async throws {
     let reader = FakeVolumeReader()
     reader.directory("/S", [Entry.file("f", allocated: mib(1), fileID: 1), Entry.dir("A")])
-    reader.directory("/S/A", [Entry.file("g", allocated: mib(2), private: mib(1), fileID: 2), Entry.dir("B")])
-    reader.directory("/S/A/B", [Entry.file("h", allocated: mib(3), fileID: 3)])
-    let result = try await build(reader, ScanOptions(root: CanonicalPath("/S")!, classifier: testClassifier,
-                                                     minimumNodeSize: big, retainedDirectoryNames: ["A", "B"]))
+    reader.directory("/S/A", [
+        Entry.file("g", allocated: mib(2), private: mib(1), fileID: 2), Entry.dir("B"),
+        Entry.file("CACHEDIR.TAG", allocated: .zero, fileID: 4),
+    ])
+    reader.directory("/S/A/B", [Entry.file("h", allocated: mib(3), fileID: 3), Entry.file("CACHEDIR.TAG", allocated: .zero, fileID: 5)])
+    let result = try await build(reader, ScanOptions(root: CanonicalPath("/S")!, classifier: testClassifier, minimumNodeSize: big))
     let root = result.root, a = root.child("A"), b = a.child("B")
     #expect(root.ownTakesUp == mib(1) && root.ownFreesAtLeast == mib(1))
     #expect(a.ownTakesUp == mib(2) && a.ownFreesAtLeast == mib(1))

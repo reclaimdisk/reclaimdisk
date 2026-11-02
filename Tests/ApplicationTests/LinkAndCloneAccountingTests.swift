@@ -68,14 +68,15 @@ private func validated(_ result: ScanBuildResult) throws -> Scan {
     #expect(scan.root.footprint.freesAtLeast <= scan.root.footprint.takesUp)
 }
 
-/// /D/proj/a/x and /D/proj/a/node_modules/x are one inode. Both folders fold, into different kinds (other, build output),
+/// /D/proj/a/x and /D/proj/a/dist/x are one inode. Both folders fold, into different kinds (other, build output),
 /// so no aggregate holds both links: the credit goes to /D, the smallest node that does.
+/// `dist` is build output and is not a retained dependency name, so 1 MiB of it still folds.
 @Test func hardLinkSplitAcrossFoldedKindsCreditsTheKeptFolder() async throws {
     let reader = FakeVolumeReader()
     reader.directory("/D", [Entry.dir("proj")])
     reader.directory("/D/proj", [Entry.dir("a")])
-    reader.directory("/D/proj/a", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2), Entry.dir("node_modules")])
-    reader.directory("/D/proj/a/node_modules", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
+    reader.directory("/D/proj/a", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2), Entry.dir("dist")])
+    reader.directory("/D/proj/a/dist", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
     let result = try await ScanBuilder(reader: reader, clock: FakeClock()).build(folding(), progress: { _ in })
     let d = result.root
     #expect(d.ownFreesAtLeast == mib(1))
@@ -85,14 +86,14 @@ private func validated(_ result: ScanBuildResult) throws -> Scan {
     #expect(scan.root.footprint.takesUp == mib(1) && scan.root.footprint.freesAtLeast == mib(1))
 }
 
-/// Both links sit inside one folded node_modules, so its aggregate holds them all and keeps the credit.
+/// Both links sit inside one folded dist folder, so its aggregate holds them all and keeps the credit.
 @Test func hardLinkInsideOneFoldedKindCreditsThatAggregate() async throws {
     let reader = FakeVolumeReader()
     reader.directory("/D", [Entry.dir("proj")])
-    reader.directory("/D/proj", [Entry.dir("node_modules")])
-    reader.directory("/D/proj/node_modules", [Entry.dir("p"), Entry.dir("q")])
-    reader.directory("/D/proj/node_modules/p", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
-    reader.directory("/D/proj/node_modules/q", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
+    reader.directory("/D/proj", [Entry.dir("dist")])
+    reader.directory("/D/proj/dist", [Entry.dir("p"), Entry.dir("q")])
+    reader.directory("/D/proj/dist/p", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
+    reader.directory("/D/proj/dist/q", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
     let result = try await ScanBuilder(reader: reader, clock: FakeClock()).build(folding(), progress: { _ in })
     let modules = try #require(result.root.children.first { $0.aggregateKind == .buildOutput })
     #expect(modules.ownTakesUp == mib(1) && modules.ownFreesAtLeast == mib(1))
@@ -100,15 +101,15 @@ private func validated(_ result: ScanBuildResult) throws -> Scan {
     _ = try validated(result)
 }
 
-/// /D/p/node_modules/x and /D/q/node_modules/x are one inode. Their common ancestor /D is kept, but both links fold
+/// /D/p/dist/x and /D/q/dist/x are one inode. Their common ancestor /D is kept, but both links fold
 /// side by side into /D's one build-output aggregate: that aggregate is the smallest node holding them, so it gets the credit.
 @Test func hardLinksFoldedSideBySideCreditTheirAggregate() async throws {
     let reader = FakeVolumeReader()
     reader.directory("/D", [Entry.dir("p"), Entry.dir("q")])
-    reader.directory("/D/p", [Entry.dir("node_modules")])
-    reader.directory("/D/q", [Entry.dir("node_modules")])
-    reader.directory("/D/p/node_modules", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
-    reader.directory("/D/q/node_modules", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
+    reader.directory("/D/p", [Entry.dir("dist")])
+    reader.directory("/D/q", [Entry.dir("dist")])
+    reader.directory("/D/p/dist", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
+    reader.directory("/D/q/dist", [Entry.file("x", allocated: mib(1), fileID: 7, links: 2)])
     let result = try await ScanBuilder(reader: reader, clock: FakeClock()).build(folding(), progress: { _ in })
     let modules = try #require(result.root.children.first { $0.aggregateKind == .buildOutput })
     #expect(modules.ownTakesUp == mib(1) && modules.ownFreesAtLeast == mib(1))
