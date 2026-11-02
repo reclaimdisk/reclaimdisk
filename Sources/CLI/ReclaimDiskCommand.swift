@@ -9,7 +9,7 @@ struct ReclaimDiskCommand: AsyncParsableCommand {
         commandName: ProductInfo.commandName,
         abstract: "See where your Mac's disk space goes and reclaim it safely.",
         version: ProductInfo.version,
-        subcommands: [ScanCommand.self]
+        subcommands: [ScanCommand.self, CandidatesCommand.self]
     )
 
     /// Usage errors exit 1 like every other error; swift-argument-parser would exit 64 (EX_USAGE), so main is ours.
