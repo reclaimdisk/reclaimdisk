@@ -23,12 +23,14 @@ public struct DockerSnapshot: Equatable, Sendable {
     public let buildCacheReclaimable: ByteCount
     public let images: [DockerImage]
     public let volumes: [DockerVolume]
-    public let anonymousVolumesReclaimable: ByteCount
+    /// Space Docker reports for anonymous volumes no container uses. nil when Docker can't tell: it adds unused named
+    /// volumes to the same total.
+    public let anonymousVolumesReclaimable: ByteCount?
     public let diskFile: DockerDiskFile?
 
     public init(
         buildCacheReclaimable: ByteCount, images: [DockerImage], volumes: [DockerVolume],
-        anonymousVolumesReclaimable: ByteCount, diskFile: DockerDiskFile?
+        anonymousVolumesReclaimable: ByteCount?, diskFile: DockerDiskFile?
     ) {
         self.buildCacheReclaimable = buildCacheReclaimable
         self.images = images

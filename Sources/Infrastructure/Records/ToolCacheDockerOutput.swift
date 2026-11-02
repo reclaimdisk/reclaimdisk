@@ -66,6 +66,13 @@ enum DockerOutput {
         }
         return volumes
     }
+
+    /// `docker system df` adds every volume no container uses to one reclaimable total, named ones included, while
+    /// `docker volume prune` removes only anonymous ones. The total belongs to the anonymous volumes only when no named
+    /// volume is unused.
+    static func anonymousVolumesReclaimable(total: ByteCount, volumes: [DockerVolume]) -> ByteCount? {
+        volumes.contains { !$0.isAnonymous && !$0.usedByContainer } ? nil : total
+    }
 }
 
 /// `yyyy-MM-dd HH:mm:ss Z zzz`, for example `2026-11-02 00:31:30 +0100 CET`. The numeric offset decides the instant.

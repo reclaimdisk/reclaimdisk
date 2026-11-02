@@ -53,7 +53,8 @@ final class LiveDockerRecords: DockerRecords, Sendable {
         }
         return .read(DockerSnapshot(
             buildCacheReclaimable: summary.buildCacheReclaimable, images: images, volumes: volumes,
-            anonymousVolumesReclaimable: summary.volumesReclaimable, diskFile: diskFile(home: home)
+            anonymousVolumesReclaimable: DockerOutput.anonymousVolumesReclaimable(total: summary.volumesReclaimable, volumes: volumes),
+            diskFile: diskFile(home: home)
         ))
     }
 }

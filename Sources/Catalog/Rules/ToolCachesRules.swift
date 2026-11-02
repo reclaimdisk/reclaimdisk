@@ -108,10 +108,19 @@ private struct DockerToolRule: Rule {
 
     /// `volume prune` without `-a` removes only anonymous volumes, and their data is gone.
     private func anonymousVolumes(_ snapshot: DockerSnapshot, now: Instant) -> [Candidate] {
-        guard snapshot.volumes.contains(where: { $0.isAnonymous && !$0.usedByContainer }),
-              let estimate = try? Estimate.toolReported(tool: "docker", size: snapshot.anonymousVolumesReclaimable),
-              let command = ToolCommand(executable: "docker", arguments: ["volume", "prune", "-f"]) else { return [] }
-        let fact = "Docker reports \(BinarySize.text(snapshot.anonymousVolumesReclaimable)) in anonymous volumes no container uses."
+        let unused = snapshot.volumes.filter { $0.isAnonymous && !$0.usedByContainer }.count
+        guard unused > 0, let command = ToolCommand(executable: "docker", arguments: ["volume", "prune", "-f"]) else { return [] }
+        let estimate: Estimate
+        let fact: String
+        if let reported = snapshot.anonymousVolumesReclaimable {
+            guard let toolReported = try? Estimate.toolReported(tool: "docker", size: reported) else { return [] }
+            estimate = toolReported
+            fact = "Docker reports \(BinarySize.text(reported)) in anonymous volumes no container uses."
+        } else {
+            estimate = .unknown
+            let volumes = unused == 1 ? "1 anonymous volume is" : "\(unused) anonymous volumes are"
+            fact = "\(volumes) not used by a container. Docker reports their size only together with unused named volumes."
+        }
         return one(
             estimate: estimate, fact: fact, source: .toolRecords("docker"), now: now, recovery: "None: the data in them is lost",
             action: .toolCommand(command), target: .toolResource(tool: "docker", identifier: "anonymous-volumes"),
