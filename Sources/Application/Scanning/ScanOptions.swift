@@ -21,7 +21,7 @@ public struct ScanOptions: Sendable {
 
     public init(
         root: CanonicalPath, classifier: KindClassifier, minimumNodeSize: ByteCount = ByteCount(268_435_456),
-        markerFileNames: Set<String> = ["CACHEDIR.TAG", ".rustc_info.json"],
+        markerFileNames: Set<String> = ["CACHEDIR.TAG", ".rustc_info.json", ".cargo-lock"],
         recordedMarkerFileNames: Set<String> = [
             "package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb",
             "pyvenv.cfg", "uv.lock", "poetry.lock", "requirements.txt", "requirements-dev.txt", "Cargo.toml",
